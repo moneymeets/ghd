@@ -1,0 +1,25 @@
+name: ghd
+author: Steffen Ohrendorf
+description: GitHub Deployer
+inputs:
+  user:
+    required: true
+    description: Username when creating a new deployment
+  access_token:
+    required: true
+    description: Access token of the user when creating a new deployment
+  args:
+    required: true
+    description: Args to the action.
+outputs:
+  deployment_id:
+    description: The deployment id when creating a deployment
+
+runs:
+  using: docker
+  image: stohrendorf/ghd:v1
+  env:
+    GITHUB_USER: ${{ inputs.user }}
+    GITHUB_ACCESS_TOKEN: ${{ inputs.access_token }}
+  args:
+    - ${{ inputs.args }}

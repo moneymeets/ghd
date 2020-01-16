@@ -18,7 +18,7 @@ outputs:
 
 runs:
   using: docker
-  image: docker://stohrendorf/ghd:v1
+  image: docker://moneymeets/ghd:v1
   env:
     GITHUB_USER: ${{ inputs.user }}
     GITHUB_TOKEN: ${{ inputs.access_token }}

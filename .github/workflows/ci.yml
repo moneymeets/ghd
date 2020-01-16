@@ -1,0 +1,23 @@
+name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      DOCKER_REGISTRY: moneymeets/ghd
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Build and publish image
+        run: |
+          # For branch names other than master (e.g. feature/test), append last branch name component (test) to the tag
+          export TAG=${GITHUB_REF##*/}
+          cd docker
+          docker build -t $DOCKER_REGISTRY:latest .
+          [ "$TAG" != "latest" ] && docker tag $DOCKER_REGISTRY:latest $DOCKER_REGISTRY:$TAG
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker push $DOCKER_REGISTRY

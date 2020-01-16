@@ -3,11 +3,13 @@ author: Steffen Ohrendorf
 description: GitHub Deployer
 inputs:
   user:
-    required: true
-    description: Username when creating a new deployment
+    required: false
+    description: Username when creating a new deployment (required to trigger the "deployment" trigger)
+    default: ""
   access_token:
-    required: true
-    description: Access token of the user when creating a new deployment
+    required: false
+    description: Access token of the user when creating a new deployment (required to trigger the "deployment" trigger)
+    default: ""
   args:
     required: true
     description: Args to the action.
@@ -17,7 +19,7 @@ outputs:
 
 runs:
   using: docker
-  image: stohrendorf/ghd:v1
+  image: docker://stohrendorf/ghd:v1
   env:
     GITHUB_USER: ${{ inputs.user }}
     GITHUB_ACCESS_TOKEN: ${{ inputs.access_token }}

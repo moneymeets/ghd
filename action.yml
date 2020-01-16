@@ -7,9 +7,8 @@ inputs:
     description: Username when creating a new deployment (required to trigger the "deployment" trigger)
     default: ""
   access_token:
-    required: false
-    description: Access token of the user when creating a new deployment (required to trigger the "deployment" trigger)
-    default: ""
+    required: true
+    description: Access token of the user when creating a new deployment
   args:
     required: true
     description: Args to the action.
@@ -22,6 +21,6 @@ runs:
   image: docker://stohrendorf/ghd:v1
   env:
     GITHUB_USER: ${{ inputs.user }}
-    GITHUB_ACCESS_TOKEN: ${{ inputs.access_token }}
+    GITHUB_TOKEN: ${{ inputs.access_token }}
   args:
     - ${{ inputs.args }}

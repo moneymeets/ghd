@@ -13,12 +13,12 @@ headers = {
     "Content-Type": "application/vnd.github.ant-man-preview+json",
 }
 
-if (bearer_token := os.environ.get("GITHUB_TOKEN")) and not os.environ.get("GITHUB_ACCESS_TOKEN"):
+if (bearer_token := os.environ.get("GITHUB_TOKEN")) and not os.environ.get("GITHUB_USER"):
     print("GitHub Workflow detected")
     auth = None
     headers["Authorization"] = "Bearer " + bearer_token
 else:
-    auth = aiohttp.BasicAuth(login=os.environ["GITHUB_USER"], password=os.environ["GITHUB_ACCESS_TOKEN"])
+    auth = aiohttp.BasicAuth(login=os.environ["GITHUB_USER"], password=os.environ["GITHUB_TOKEN"])
 
 headers_flash = {
     **headers,
@@ -246,7 +246,7 @@ async def main():
 If $GITHUB_TOKEN is present, it is used as the bearer token to authenticate against the API; not that you CANNOT
 create deployments using the token provided by GitHub itself in the runner context.
 
-Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_ACCESS_TOKEN with all deployment access scopes.
+Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN with all deployment access scopes.
     """
 
     if cmd == "list":
@@ -268,9 +268,9 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_ACCESS_
                           help="Reference to create the deployment from")
         argp.add_argument("-e", "--environment", dest="environment", required=True,
                           help="Environment name")
-        argp.add_argument("-t", "--transient", dest="transient", action="store_true", default=True,
+        argp.add_argument("-t", "--transient", dest="transient", action="store_true", default=False,
                           help="Mark as transient environment")
-        argp.add_argument("-p", "--production", dest="production", action="store_true", default=True,
+        argp.add_argument("-p", "--production", dest="production", action="store_true", default=False,
                           help="Mark as production environment")
         args = argp.parse_args(use_argv)
 

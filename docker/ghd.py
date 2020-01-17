@@ -270,7 +270,7 @@ def color_state(state: str):
         "queued": colorama.Fore.CYAN,
         "success": colorama.Fore.GREEN,
         "error": colorama.Fore.RED + colorama.Style.BRIGHT,
-        "failed": colorama.Fore.RED + colorama.Style.BRIGHT,
+        "failure": colorama.Fore.RED + colorama.Style.BRIGHT,
         "in_progress": colorama.Fore.YELLOW,
     }.get(state, colorama.Fore.BLUE)
 

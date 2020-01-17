@@ -51,7 +51,6 @@ def get_repo_from_git():
 
     unique_urls = set()
     for url in urls:
-        print(url)
         if matchGit := re.fullmatch(r"git@github\.com:([^/]+/[^/]+)\.git", url):
             unique_urls.add(matchGit.group(1))
         elif matchHttps := re.fullmatch(r"https://github\.com/([^/]+/[^/]+)\.git", url):

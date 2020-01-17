@@ -148,8 +148,8 @@ class GitHub:
                       key=lambda e: e["id"],
                       reverse=True)
 
-    async def create_deployment(self, ref: str, environment: str, transient: bool, production: bool,
-                                task: str = "deploy"):
+    async def create_deployment(self, ref: str, environment: str, transient: bool, production: bool, task: str,
+                                description: str):
         return await self.post(f'/repos/{self.repo_path}/deployments', {
             "ref": ref,
             "auto_merge": False,
@@ -157,7 +157,7 @@ class GitHub:
             "transient_environment": transient,
             "production_environment": production,
             "task": task,
-            "description": "Deployed from CLI",
+            "description": description,
             "required_contexts": [],  # TODO
         })
 
@@ -239,12 +239,14 @@ class GitHub:
 
         print(tabulate.tabulate(tbl, headers="keys"))
 
-    async def deploy(self, environment: str, ref: str, transient: bool, production: bool):
+    async def deploy(self, environment: str, ref: str, transient: bool, production: bool, task: str, description: str):
         print("Creating deployment...")
         tmp = await self.create_deployment(ref=ref,
                                            environment=environment,
                                            transient=transient,
-                                           production=production)
+                                           production=production,
+                                           task=task,
+                                           description=description)
         if "id" not in tmp:
             print(tmp)
             raise RuntimeError()
@@ -287,8 +289,9 @@ async def main():
     del use_argv[:2]
 
     epilogue = """
-If $GITHUB_TOKEN is present, it is used as the bearer token to authenticate against the API; not that you CANNOT
-create deployments using the token provided by GitHub itself in the runner context.
+$GITHUB_TOKEN must always be present, $GITHUB_USER is optional; note that you CANNOT create deployments using the token
+provided by GitHub itself in the runner context, i.e. you must provide a real user's account token and the user's
+username if you want the "deployments" event to trigger a workflow.
 
 Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN with all deployment access scopes.
     """
@@ -297,7 +300,8 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
     current_environment = deep_dict_get(github_event_data, "deployment", "environment")
 
     if cmd == "list":
-        argp = argparse.ArgumentParser(description="List deployments", prog="ghd", epilog=epilogue)
+        argp = argparse.ArgumentParser(description="List deployments", prog="ghd", epilog=epilogue,
+                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         argp.add_argument("-r", "--repo", dest="repo",
                           help="Repository to use, e.g. moneymeets/ghd")
         argp.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False,
@@ -308,25 +312,33 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
         async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
             await gh.list(limit=args.limit, verbose=args.verbose)
     elif cmd == "deploy":
-        argp = argparse.ArgumentParser(description="Create new deployment", prog="ghd", epilog=epilogue)
+        argp = argparse.ArgumentParser(description="Create new deployment", prog="ghd", epilog=epilogue,
+                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         argp.add_argument("-r", "--repo", dest="repo",
                           help="Repository to use, e.g. moneymeets/ghd")
         argp.add_argument("-R", "--ref", dest="ref",
                           help="Reference to create the deployment from")
         argp.add_argument("-e", "--environment", dest="environment", required=True,
                           help="Environment name")
+        argp.add_argument("-T", "--task", dest="task", default="deploy",
+                          help="Deployment task")
         argp.add_argument("-t", "--transient", dest="transient", action="store_true", default=False,
                           help="Mark as transient environment")
         argp.add_argument("-p", "--production", dest="production", action="store_true", default=False,
                           help="Mark as production environment")
+        argp.add_argument("-d", "--description", dest="description", required=False, default="Deployed via GHD",
+                          help="Deployment description")
         args = argp.parse_args(use_argv)
 
         async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
             await gh.deploy(environment=args.environment, ref=args.ref or github_event_path[""],
                             transient=args.transient,
-                            production=args.production)
+                            production=args.production,
+                            task=args.task,
+                            description=args.description)
     elif cmd == "set-state":
-        argp = argparse.ArgumentParser(description="Set deployment state", prog="ghd", epilog=epilogue)
+        argp = argparse.ArgumentParser(description="Set deployment state", prog="ghd", epilog=epilogue,
+                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         argp.add_argument("-r", "--repo", dest="repo",
                           help="Repository to use, e.g. moneymeets/ghd")
         argp.add_argument("-e", "--environment", dest="environment", required=current_environment is None,
@@ -347,11 +359,12 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
                                               environment=args.environment,
                                               description=args.description)
     elif cmd == "inspect":
-        argp = argparse.ArgumentParser(description="Inspect deployment state", prog="ghd", epilog=epilogue)
+        argp = argparse.ArgumentParser(description="Inspect deployment state", prog="ghd", epilog=epilogue,
+                                       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         argp.add_argument("-r", "--repo", dest="repo",
                           help="Repository to use, e.g. moneymeets/ghd")
         argp.add_argument("-d", "--deployment-id", dest="deployment_id", type=int, required=current_deployment is None,
-                          default=int(current_deployment) if current_deployment else None, help="Deployment ID")
+                          default=int(current_deployment) if current_deployment else argparse, help="Deployment ID")
         args = argp.parse_args(use_argv)
 
         async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:

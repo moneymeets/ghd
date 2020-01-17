@@ -8,15 +8,17 @@ import colorama
 import tabulate
 import progressbar
 import sys
+import subprocess
+import re
+import json
 
 headers = {
     "Content-Type": "application/vnd.github.ant-man-preview+json",
 }
 
-if (bearer_token := os.environ.get("GITHUB_TOKEN")) and not os.environ.get("GITHUB_USER"):
-    print("GitHub Workflow detected")
+if not os.environ.get("GITHUB_USER"):
     auth = None
-    headers["Authorization"] = "Bearer " + bearer_token
+    headers["Authorization"] = "Bearer " + os.environ["GITHUB_TOKEN"]
 else:
     auth = aiohttp.BasicAuth(login=os.environ["GITHUB_USER"], password=os.environ["GITHUB_TOKEN"])
 
@@ -33,6 +35,49 @@ headers_ant_man = {
 YES = colorama.Fore.GREEN + colorama.Style.BRIGHT + "yes" + colorama.Fore.RESET + colorama.Style.RESET_ALL
 NO = colorama.Fore.RED + "no" + colorama.Fore.RESET
 UNKNOWN = colorama.Fore.BLUE + colorama.Style.DIM + "unknown" + colorama.Fore.RESET + colorama.Style.RESET_ALL
+
+github_event_data = dict()
+if (github_event_path := os.environ.get("GITHUB_EVENT_PATH")) and os.path.exists(github_event_path):
+    print("Found GitHub Event Path")
+    with open(github_event_path, "r") as f:
+        github_event_data = json.load(f)
+
+
+def get_repo_from_git():
+    try:
+        urls = set([line.split()[1] for line in subprocess.getoutput("git remote -v").splitlines()])
+    except IndexError:
+        return None
+
+    unique_urls = set()
+    for url in urls:
+        print(url)
+        if matchGit := re.fullmatch(r"git@github\.com:([^/]+/[^/]+)\.git", url):
+            unique_urls.add(matchGit.group(1))
+        elif matchHttps := re.fullmatch(r"https://github\.com/([^/]+/[^/]+)\.git", url):
+            unique_urls.add(matchHttps.group(1))
+
+    if len(unique_urls) == 1:
+        return next(iter(unique_urls))
+    else:
+        return None
+
+
+def deep_dict_get(d: dict, *path):
+    current = d
+    for key in path:
+        if current is None:
+            return None
+        current = current.get(key)
+    return current
+
+
+def get_repo_or_fallback(repo: str):
+    return (repo
+            or os.environ.get("GITHUB_REPOSITORY")
+            or deep_dict_get(github_event_data, "repository", "full_name")
+            or get_repo_from_git()
+            )
 
 
 class GitHub:
@@ -233,7 +278,7 @@ def color_state(state: str):
 
 async def main():
     if len(sys.argv) < 2:
-        print("Missing action (list, deploy, set-state)")
+        print("Missing action (list, inspect, deploy, set-state)")
         exit(1)
 
     colorama.init()
@@ -249,21 +294,24 @@ create deployments using the token provided by GitHub itself in the runner conte
 Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN with all deployment access scopes.
     """
 
+    current_deployment = deep_dict_get(github_event_data, "deployment", "id")
+    current_environment = deep_dict_get(github_event_data, "deployment", "environment")
+
     if cmd == "list":
         argp = argparse.ArgumentParser(description="List deployments", prog="ghd", epilog=epilogue)
         argp.add_argument("-r", "--repo", dest="repo",
-                          help="Repository to use, e.g. stohrendorf/ghd; uses $GITHUB_REPOSITORY if present")
+                          help="Repository to use, e.g. moneymeets/ghd")
         argp.add_argument("-v", "--verbose", dest="verbose", action="store_true", default=False,
                           help="Print deployment states (slow)")
         argp.add_argument("-l", "--limit", dest="limit", type=int, default=10, help="How many deployments to list")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=args.repo or os.environ.get("GITHUB_REPOSITORY")) as gh:
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
             await gh.list(limit=args.limit, verbose=args.verbose)
     elif cmd == "deploy":
         argp = argparse.ArgumentParser(description="Create new deployment", prog="ghd", epilog=epilogue)
         argp.add_argument("-r", "--repo", dest="repo",
-                          help="Repository to use, e.g. stohrendorf/ghd; uses $GITHUB_REPOSITORY if present")
+                          help="Repository to use, e.g. moneymeets/ghd")
         argp.add_argument("-R", "--ref", dest="ref",
                           help="Reference to create the deployment from")
         argp.add_argument("-e", "--environment", dest="environment", required=True,
@@ -274,18 +322,18 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
                           help="Mark as production environment")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=args.repo or os.environ.get("GITHUB_REPOSITORY")) as gh:
-            await gh.deploy(environment=args.environment, ref=args.ref,
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
+            await gh.deploy(environment=args.environment, ref=args.ref or github_event_path[""],
                             transient=args.transient,
                             production=args.production)
     elif cmd == "set-state":
         argp = argparse.ArgumentParser(description="Set deployment state", prog="ghd", epilog=epilogue)
         argp.add_argument("-r", "--repo", dest="repo",
-                          help="Repository to use, e.g. stohrendorf/ghd; uses $GITHUB_REPOSITORY if present")
-        argp.add_argument("-e", "--environment", dest="environment", required=True,
-                          help="Environment name")
-        argp.add_argument("-d", "--deployment-id", dest="deployment_id", type=int, required=True,
-                          help="Deployment ID")
+                          help="Repository to use, e.g. moneymeets/ghd")
+        argp.add_argument("-e", "--environment", dest="environment", required=current_environment is None,
+                          default=current_environment, help="Environment name")
+        argp.add_argument("-d", "--deployment-id", dest="deployment_id", type=int, required=current_deployment is None,
+                          default=int(current_deployment) if current_deployment else None, help="Deployment ID")
         argp.add_argument("-s", "--state", dest="state", type=str, required=True,
                           choices=("error", "failure", "pending", "in_progress", "queued", "success"),
                           help="State")
@@ -294,7 +342,7 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
                           help="Description")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=args.repo or os.environ.get("GITHUB_REPOSITORY")) as gh:
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
             await gh.create_deployment_status(deployment_id=args.deployment_id,
                                               state=args.state,
                                               environment=args.environment,
@@ -302,16 +350,20 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
     elif cmd == "inspect":
         argp = argparse.ArgumentParser(description="Inspect deployment state", prog="ghd", epilog=epilogue)
         argp.add_argument("-r", "--repo", dest="repo",
-                          help="Repository to use, e.g. stohrendorf/ghd; uses $GITHUB_REPOSITORY if present")
-        argp.add_argument("-d", "--deployment-id", dest="deployment_id", type=int, required=True,
-                          help="Deployment ID")
+                          help="Repository to use, e.g. moneymeets/ghd")
+        argp.add_argument("-d", "--deployment-id", dest="deployment_id", type=int, required=current_deployment is None,
+                          default=int(current_deployment) if current_deployment else None, help="Deployment ID")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=args.repo or os.environ.get("GITHUB_REPOSITORY")) as gh:
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
             await gh.inspect(deployment_id=args.deployment_id)
     else:
         raise RuntimeError(f"Command {cmd} does not exist")
 
 
-if __name__ == '__main__':
+def run_main():
     asyncio.run(main())
+
+
+if __name__ == '__main__':
+    run_main()

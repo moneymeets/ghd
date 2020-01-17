@@ -16,3 +16,6 @@ aiohttp = "^3.6.2"
 [build-system]
 requires = ["poetry>=1.0.0"]
 build-backend = "poetry.masonry.api"
+
+[tool.poetry.scripts]
+ghd = 'ghd:run_main'

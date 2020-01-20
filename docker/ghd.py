@@ -38,7 +38,7 @@ UNKNOWN = colorama.Fore.BLUE + colorama.Style.DIM + "unknown" + colorama.Fore.RE
 
 github_event_data = dict()
 if (github_event_path := os.environ.get("GITHUB_EVENT_PATH")) and os.path.exists(github_event_path):
-    print("Found GitHub Event Path")
+    print(colorama.Fore.MAGENTA + "Found GitHub Event Path" + colorama.Fore.RESET)
     with open(github_event_path, "r") as f:
         github_event_data = json.load(f)
 
@@ -87,7 +87,7 @@ class GitHub:
         self.session_flash = aiohttp.ClientSession(headers=headers_flash, auth=auth)
         self.session_ant_man = aiohttp.ClientSession(headers=headers_ant_man, auth=auth)
 
-        print(f"Working in {repo_path}")
+        print(colorama.Fore.MAGENTA + f"Working in {repo_path}" + colorama.Fore.RESET)
 
     def __enter__(self) -> None:
         raise TypeError("Use async with instead")
@@ -240,7 +240,7 @@ class GitHub:
         print(tabulate.tabulate(tbl, headers="keys"))
 
     async def deploy(self, environment: str, ref: str, transient: bool, production: bool, task: str, description: str):
-        print("Creating deployment...")
+        print(colorama.Fore.MAGENTA + "Creating deployment..." + colorama.Fore.RESET)
         tmp = await self.create_deployment(ref=ref,
                                            environment=environment,
                                            transient=transient,
@@ -252,7 +252,7 @@ class GitHub:
             raise RuntimeError()
 
         print(f"::set-output name=deployment_id::{tmp['id']}")
-        print(f"Deployment {tmp['id']} created")
+        print(colorama.Fore.MAGENTA + f"Deployment {tmp['id']} created" + colorama.Fore.RESET)
 
 
 def bool_to_str(b):
@@ -279,7 +279,7 @@ def color_state(state: str):
 
 async def main():
     if len(sys.argv) < 2:
-        print("Missing action (list, inspect, deploy, set-state)")
+        print(colorama.Fore.RED + "Missing action (list, inspect, deploy, set-state)" + colorama.Fore.RESET)
         exit(1)
 
     colorama.init()
@@ -363,12 +363,15 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         argp.add_argument("-r", "--repo", dest="repo",
                           help="Repository to use, e.g. moneymeets/ghd")
-        argp.add_argument("-d", "--deployment-id", dest="deployment_id", type=int, required=current_deployment is None,
-                          default=int(current_deployment) if current_deployment else argparse, help="Deployment ID")
+        argp.add_argument(dest="deployment_id", type=int, nargs="?", help="Deployment ID")
         args = argp.parse_args(use_argv)
 
+        if args.deployment_id is None and current_deployment is None:
+            print(colorama.Fore.RED + "Missing deployment id" + colorama.Fore.RESET)
+            return
+
         async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
-            await gh.inspect(deployment_id=args.deployment_id)
+            await gh.inspect(deployment_id=args.deployment_id or int(current_deployment))
     else:
         raise RuntimeError(f"Command {cmd} does not exist")
 

@@ -12,17 +12,68 @@ import subprocess
 import re
 import json
 
-YES = colorama.Fore.GREEN + colorama.Style.BRIGHT + "yes" + colorama.Fore.RESET + colorama.Style.RESET_ALL
-NO = colorama.Fore.RED + "no" + colorama.Fore.RESET
-UNKNOWN = colorama.Fore.BLUE + colorama.Style.DIM + "unknown" + colorama.Fore.RESET + colorama.Style.RESET_ALL
+
+def color_str(color, s):
+    return f"{color}{s}{colorama.Fore.RESET}{colorama.Style.RESET_ALL}"
+
+
+def color_print(color, s, **kwargs):
+    print(color_str(color, s), **kwargs)
+
+
+def print_fatal(s, **kwargs):
+    color_print(colorama.Fore.RED + colorama.Style.BRIGHT, s, **kwargs)
+
+
+def color_error(s):
+    return color_str(colorama.Fore.RED, s)
+
+
+def print_error(s, **kwargs):
+    print(color_error(s), **kwargs)
+
+
+def color_warning(s):
+    return color_str(colorama.Fore.YELLOW, s)
+
+
+def print_warning(s, **kwargs):
+    print(color_warning(s), **kwargs)
+
+
+def color_success(s):
+    return color_str(colorama.Fore.GREEN, s)
+
+
+def print_success(s, **kwargs):
+    print(color_success(s), **kwargs)
+
+
+def color_unknown(s):
+    return color_str(colorama.Fore.BLUE, s)
+
+
+def print_unknown(s, **kwargs):
+    print(color_unknown(s), **kwargs)
+
+
+def print_info(s, **kwargs):
+    color_print(colorama.Fore.CYAN, s, **kwargs)
 
 
 def read_github_event_data():
     if (github_event_path := os.environ.get("GITHUB_EVENT_PATH")) and os.path.exists(github_event_path):
-        print(colorama.Fore.MAGENTA + "Found GitHub Event Path" + colorama.Fore.RESET)
+        print_info("Found GitHub Event Path")
         with open(github_event_path, "r") as f:
             return json.load(f)
     return dict()
+
+
+def short_sha(ref: str) -> str:
+    if re.fullmatch(r"[a-f0-9]{40}", ref):
+        return ref[:7]
+    else:
+        return ref
 
 
 def get_repo_from_git():
@@ -89,7 +140,7 @@ class GitHub:
         self.session_flash = aiohttp.ClientSession(headers=self.headers_flash, auth=auth)
         self.session_ant_man = aiohttp.ClientSession(headers=self.headers_ant_man, auth=auth)
 
-        print(colorama.Fore.MAGENTA + f"Working in {repo_path}" + colorama.Fore.RESET)
+        print_info(f"Working in {repo_path}")
 
     def __enter__(self) -> None:
         raise TypeError("Use async with instead")
@@ -194,7 +245,7 @@ class GitHub:
             " ",
             progressbar.Timer(),
         ], prefix="Getting Deployments ", fd=sys.stdout):
-            tbl["ref"].append(deployment["ref"])
+            tbl["ref"].append(short_sha(deployment["ref"]))
             tbl["id"].append(deployment["id"])
             env = deployment["environment"]
             oenv = deployment["original_environment"]
@@ -218,8 +269,8 @@ class GitHub:
                 tbl["state"].append(color_state(status["state"]))
                 tbl["status_changed"].append(status["created_at"])
             else:
-                tbl["state"].append(UNKNOWN)
-                tbl["status_changed"].append(UNKNOWN)
+                tbl["state"].append(color_unknown("unknown"))
+                tbl["status_changed"].append(color_unknown("unknown"))
 
         print(tabulate.tabulate(tbl, headers="keys"))
 
@@ -242,7 +293,7 @@ class GitHub:
         print(tabulate.tabulate(tbl, headers="keys"))
 
     async def deploy(self, environment: str, ref: str, transient: bool, production: bool, task: str, description: str):
-        print(colorama.Fore.MAGENTA + "Creating deployment..." + colorama.Fore.RESET)
+        print_info("Creating deployment")
         tmp = await self.create_deployment(ref=ref,
                                            environment=environment,
                                            transient=transient,
@@ -254,16 +305,16 @@ class GitHub:
             raise RuntimeError()
 
         print(f"::set-output name=deployment_id::{tmp['id']}")
-        print(colorama.Fore.MAGENTA + f"Deployment {tmp['id']} created" + colorama.Fore.RESET)
+        print_success(f"Deployment {tmp['id']} created")
 
 
 def bool_to_str(b):
     if b is None:
-        return UNKNOWN
+        return color_unknown("unknown")
     elif b:
-        return YES
+        return color_success("yes")
     else:
-        return NO
+        return color_error("no")
 
 
 def color_state(state: str):
@@ -276,15 +327,15 @@ def color_state(state: str):
         "in_progress": colorama.Fore.YELLOW,
     }.get(state, colorama.Fore.BLUE)
 
-    return color + state + colorama.Fore.RESET + colorama.Style.RESET_ALL
+    return color_str(color, state)
 
 
 async def main():
-    if len(sys.argv) < 2:
-        print(colorama.Fore.RED + "Missing action (list, inspect, deploy, set-state)" + colorama.Fore.RESET)
-        exit(1)
-
     colorama.init()
+
+    if len(sys.argv) < 2:
+        print_error("Missing action (list, inspect, deploy, set-state)")
+        exit(1)
 
     github_event_data = read_github_event_data()
 
@@ -371,7 +422,7 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
         args = argp.parse_args(use_argv)
 
         if args.deployment_id is None and current_deployment is None:
-            print(colorama.Fore.RED + "Missing deployment id" + colorama.Fore.RESET)
+            print_error("Missing deployment id")
             return
 
         async with GitHub(repo_path=get_repo_or_fallback(args.repo, github_event_data)) as gh:

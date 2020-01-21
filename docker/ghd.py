@@ -12,35 +12,17 @@ import subprocess
 import re
 import json
 
-headers = {
-    "Content-Type": "application/vnd.github.ant-man-preview+json",
-}
-
-if not os.environ.get("GITHUB_USER"):
-    auth = None
-    headers["Authorization"] = "Bearer " + os.environ["GITHUB_TOKEN"]
-else:
-    auth = aiohttp.BasicAuth(login=os.environ["GITHUB_USER"], password=os.environ["GITHUB_TOKEN"])
-
-headers_flash = {
-    **headers,
-    "Accept": "application/vnd.github.flash-preview+json",
-}
-
-headers_ant_man = {
-    **headers,
-    "Accept": "application/vnd.github.ant-man-preview+json",
-}
-
 YES = colorama.Fore.GREEN + colorama.Style.BRIGHT + "yes" + colorama.Fore.RESET + colorama.Style.RESET_ALL
 NO = colorama.Fore.RED + "no" + colorama.Fore.RESET
 UNKNOWN = colorama.Fore.BLUE + colorama.Style.DIM + "unknown" + colorama.Fore.RESET + colorama.Style.RESET_ALL
 
-github_event_data = dict()
-if (github_event_path := os.environ.get("GITHUB_EVENT_PATH")) and os.path.exists(github_event_path):
-    print(colorama.Fore.MAGENTA + "Found GitHub Event Path" + colorama.Fore.RESET)
-    with open(github_event_path, "r") as f:
-        github_event_data = json.load(f)
+
+def read_github_event_data():
+    if (github_event_path := os.environ.get("GITHUB_EVENT_PATH")) and os.path.exists(github_event_path):
+        print(colorama.Fore.MAGENTA + "Found GitHub Event Path" + colorama.Fore.RESET)
+        with open(github_event_path, "r") as f:
+            return json.load(f)
+    return dict()
 
 
 def get_repo_from_git():
@@ -71,7 +53,7 @@ def deep_dict_get(d: dict, *path):
     return current
 
 
-def get_repo_or_fallback(repo: str):
+def get_repo_or_fallback(repo: str, github_event_data):
     return (repo
             or os.environ.get("GITHUB_REPOSITORY")
             or deep_dict_get(github_event_data, "repository", "full_name")
@@ -83,9 +65,29 @@ class GitHub:
     def __init__(self, repo_path: str):
         assert repo_path
 
+        headers = {
+            "Content-Type": "application/vnd.github.ant-man-preview+json",
+        }
+
+        if not os.environ.get("GITHUB_USER"):
+            auth = None
+            headers["Authorization"] = "Bearer " + os.environ["GITHUB_TOKEN"]
+        else:
+            auth = aiohttp.BasicAuth(login=os.environ["GITHUB_USER"], password=os.environ["GITHUB_TOKEN"])
+
+        self.headers_flash = {
+            **headers,
+            "Accept": "application/vnd.github.flash-preview+json",
+        }
+
+        self.headers_ant_man = {
+            **headers,
+            "Accept": "application/vnd.github.ant-man-preview+json",
+        }
+
         self.repo_path = repo_path
-        self.session_flash = aiohttp.ClientSession(headers=headers_flash, auth=auth)
-        self.session_ant_man = aiohttp.ClientSession(headers=headers_ant_man, auth=auth)
+        self.session_flash = aiohttp.ClientSession(headers=self.headers_flash, auth=auth)
+        self.session_ant_man = aiohttp.ClientSession(headers=self.headers_ant_man, auth=auth)
 
         print(colorama.Fore.MAGENTA + f"Working in {repo_path}" + colorama.Fore.RESET)
 
@@ -284,6 +286,8 @@ async def main():
 
     colorama.init()
 
+    github_event_data = read_github_event_data()
+
     use_argv = sys.argv[:]
     cmd = use_argv[1]
     del use_argv[:2]
@@ -309,7 +313,7 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
         argp.add_argument("-l", "--limit", dest="limit", type=int, default=10, help="How many deployments to list")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo, github_event_data)) as gh:
             await gh.list(limit=args.limit, verbose=args.verbose)
     elif cmd == "deploy":
         argp = argparse.ArgumentParser(description="Create new deployment", prog="ghd", epilog=epilogue,
@@ -330,8 +334,8 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
                           help="Deployment description")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
-            await gh.deploy(environment=args.environment, ref=args.ref or github_event_path[""],
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo, github_event_data)) as gh:
+            await gh.deploy(environment=args.environment, ref=args.ref or os.environ.get("GITHUB_SHA"),
                             transient=args.transient,
                             production=args.production,
                             task=args.task,
@@ -353,7 +357,7 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
                           help="Description")
         args = argp.parse_args(use_argv)
 
-        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo, github_event_data)) as gh:
             await gh.create_deployment_status(deployment_id=args.deployment_id,
                                               state=args.state,
                                               environment=args.environment,
@@ -370,7 +374,7 @@ Instead, for deployments, supply a personalized $GITHUB_USER and $GITHUB_TOKEN w
             print(colorama.Fore.RED + "Missing deployment id" + colorama.Fore.RESET)
             return
 
-        async with GitHub(repo_path=get_repo_or_fallback(args.repo)) as gh:
+        async with GitHub(repo_path=get_repo_or_fallback(args.repo, github_event_data)) as gh:
             await gh.inspect(deployment_id=args.deployment_id or int(current_deployment))
     else:
         raise RuntimeError(f"Command {cmd} does not exist")

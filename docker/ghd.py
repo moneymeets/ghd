@@ -37,13 +37,13 @@ async def cmd_list(repo: str, verbose: bool, limit: int):
 @main_group.command(name="deploy", short_help="Create new deployment")
 @click.option("-r", "--repo", required=False, help="Repository to use, e.g. moneymeets/ghd")
 @click.option("-R", "--ref", required=True, help="Reference to create the deployment from")
-@click.option("-e", "--environment", required=True, help="Environment name")
+@click.option("-e", "--environment", required=True, prompt=True, help="Environment name")
 @click.option("-T", "--task", default="deploy", help="Deployment task")
-@click.option("-t", "--transient", required=False, is_flag=True, flag_value=True, default=False,
+@click.option("-t", "--transient", required=False, is_flag=True, flag_value=True, prompt=True, default=False,
               help="Mark as transient environment")
-@click.option("-p", "--production", required=False, is_flag=True, flag_value=True, default=False,
+@click.option("-p", "--production", required=False, is_flag=True, flag_value=True, prompt=True, default=False,
               help="Mark as production environment")
-@click.option("-d", "--description", default="Deployed via GHD", help="Deployment description")
+@click.option("-d", "--description", default="Deployed via GHD", prompt=True, help="Deployment description")
 @coroutine
 async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient: bool, production: bool,
                      description: str):

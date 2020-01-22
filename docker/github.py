@@ -1,14 +1,24 @@
 import json
 import os
 import sys
+import enum
 
 import aiohttp
 import colorama
 import progressbar
 import tabulate
 
-from util import short_sha, bool_to_str
+from util import short_sha, bool_to_str, deep_dict_get
 from output import print_success, color_unknown, print_info, color_str
+
+
+class DeploymentState(enum.Enum):
+    error = enum.auto()
+    failure = enum.auto()
+    pending = enum.auto()
+    in_progress = enum.auto()
+    queued = enum.auto()
+    success = enum.auto()
 
 
 class GitHub:
@@ -113,9 +123,10 @@ class GitHub:
             "required_contexts": [],  # TODO
         })
 
-    async def create_deployment_status(self, deployment_id: int, state: str, environment: str, description: str):
+    async def create_deployment_status(self, deployment_id: int, state: DeploymentState, environment: str,
+                                       description: str):
         return await self.post_flash(f'/repos/{self.repo_path}/deployments/{deployment_id}/statuses', {
-            "state": state,
+            "state": state.name,
             "description": description,
             "environment": environment,
         })
@@ -224,14 +235,23 @@ def read_github_event_data():
     return _github_event_data
 
 
+def get_current_deployment_id():
+    deployment_id = deep_dict_get(read_github_event_data(), "deployment", "id")
+    return int(deployment_id) if deployment_id else None
+
+
+def get_current_environment():
+    return deep_dict_get(read_github_event_data(), "deployment", "environment")
+
+
 def color_state(state: str):
     color = {
-        "pending": colorama.Fore.CYAN,
-        "queued": colorama.Fore.CYAN,
-        "success": colorama.Fore.GREEN,
-        "error": colorama.Fore.RED + colorama.Style.BRIGHT,
-        "failure": colorama.Fore.RED + colorama.Style.BRIGHT,
-        "in_progress": colorama.Fore.YELLOW,
+        DeploymentState.pending.name: colorama.Fore.CYAN,
+        DeploymentState.queued.name: colorama.Fore.CYAN,
+        DeploymentState.success.name: colorama.Fore.GREEN,
+        DeploymentState.error.name: colorama.Fore.RED + colorama.Style.BRIGHT,
+        DeploymentState.failure.name: colorama.Fore.RED + colorama.Style.BRIGHT,
+        DeploymentState.in_progress.name: colorama.Fore.YELLOW,
     }.get(state, colorama.Fore.BLUE)
 
     return color_str(color, state)

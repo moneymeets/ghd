@@ -5,8 +5,8 @@ import os
 import colorama
 
 from functools import wraps
-from github import GitHub, read_github_event_data
-from util import deep_dict_get, get_repo_or_fallback
+from github import DeploymentState, GitHub, read_github_event_data, get_current_deployment_id, get_current_environment
+from util import get_repo_or_fallback
 
 
 def coroutine(f):
@@ -58,19 +58,18 @@ async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient
 
 @main_group.command(name="set-state", short_help="Set deployment state")
 @click.option("-r", "--repo", required=False, help="Repository to use, e.g. moneymeets/ghd")
-@click.option("-e", "--environment", required=True,
-              default=deep_dict_get(read_github_event_data(), "deployment", "environment"), help="Environment name")
-@click.option("-d", "--deployment-id", type=int, required=True, default=int(deployment_id) if (
-deployment_id := deep_dict_get(read_github_event_data(), "deployment", "id")) else None, help="Deployment ID")
+@click.option("-e", "--environment", required=True, default=get_current_environment(), help="Environment name")
+@click.option("-d", "--deployment-id", type=int, required=True, default=get_current_deployment_id(),
+              help="Deployment ID")
 @click.option("-s", "--state",
-              type=click.Choice(choices=("error", "failure", "pending", "in_progress", "queued", "success")),
+              type=click.Choice(choices=DeploymentState.__members__.keys()),
               required=True, help="State")
-@click.option("-d", "--description", default="Deployed via GHD", help="Deployment description")
+@click.option("-D", "--description", default="Deployed via GHD", help="Deployment description")
 @coroutine
 async def cmd_set_state(repo: str, environment: str, deployment_id: int, state: str, description: str):
     async with GitHub(repo_path=get_repo_or_fallback(repo, read_github_event_data())) as gh:
         await gh.create_deployment_status(deployment_id=deployment_id,
-                                          state=state,
+                                          state=DeploymentState[state],
                                           environment=environment,
                                           description=description)
 

@@ -12,6 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Lint
+        run: |
+          poetry run flake8
+
       - name: Build and publish image
         run: |
           # For branch names other than master (e.g. feature/test), append last branch name component (test) to the tag

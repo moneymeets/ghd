@@ -13,10 +13,14 @@ aiohttp = "^3.6.2"
 click = "^7.0"
 
 [tool.poetry.dev-dependencies]
+flake8 = "*"
+flake8-quotes = "*"
+flake8-coding = "*"
+flake8-commas = "*"
+flake8-import-order = "*"
 
 [tool.poetry.scripts]
 ghd = 'ghd:run_main'
 [build-system]
 requires = ["poetry>=1.0.0"]
 build-backend = "poetry.masonry.api"
-

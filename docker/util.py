@@ -2,7 +2,7 @@ import os
 import re
 import subprocess
 
-from output import color_unknown, color_success, color_error
+from output import color_error, color_success, color_unknown
 
 
 def short_sha(ref: str) -> str:
@@ -20,10 +20,14 @@ def get_repo_from_git():
 
     unique_urls = set()
     for url in urls:
-        if matchGit := re.fullmatch(r"git@github\.com:([^/]+/[^/]+)\.git", url):
-            unique_urls.add(matchGit.group(1))
-        elif matchHttps := re.fullmatch(r"https://github\.com/([^/]+/[^/]+)\.git", url):
-            unique_urls.add(matchHttps.group(1))
+        # TODO: Use walrus operator when flake8 supports it
+        match_git = re.fullmatch(r"git@github\.com:([^/]+/[^/]+)\.git", url)
+        if match_git:
+            unique_urls.add(match_git.group(1))
+        # TODO: Use walrus operator when flake8 supports it
+        match_https = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)\.git", url)
+        if match_https:
+            unique_urls.add(match_https.group(1))
 
     if len(unique_urls) == 1:
         return next(iter(unique_urls))
@@ -38,6 +42,12 @@ def deep_dict_get(d: dict, *path):
             return None
         current = current.get(key)
     return current
+
+
+def get_repo_fallback(github_event_data):
+    return (os.environ.get("GITHUB_REPOSITORY")
+            or deep_dict_get(github_event_data, "repository", "full_name")
+            or get_repo_from_git())
 
 
 def get_repo_or_fallback(repo: str, github_event_data):

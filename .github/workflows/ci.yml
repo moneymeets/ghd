@@ -33,11 +33,11 @@ jobs:
       - name: Install Dependencies
         if: steps.poetry-cache.outputs.cache-hit != 'true'
         run: |
-          poetry install
+          cd docker && poetry install
 
       - name: Lint
         run: |
-          poetry run flake8
+          cd docker && poetry run flake8
 
       - name: Build and publish image
         run: |

@@ -1,15 +1,14 @@
+import enum
 import json
 import os
 import sys
-import enum
 
 import aiohttp
 import colorama
 import progressbar
 import tabulate
-
-from util import short_sha, bool_to_str, deep_dict_get
-from output import print_success, color_unknown, print_info, color_str
+from output import color_str, color_unknown, print_info, print_success
+from util import bool_to_str, deep_dict_get, short_sha
 
 
 class DeploymentState(enum.Enum):
@@ -22,6 +21,10 @@ class DeploymentState(enum.Enum):
 
 
 class GitHub:
+    @staticmethod
+    def _api_url(path: str) -> str:
+        return f"https://api.github.com{path}"
+
     def __init__(self, repo_path: str):
         assert repo_path
 
@@ -61,7 +64,7 @@ class GitHub:
         # __exit__ should exist in pair with __enter__ but never executed
         pass  # pragma: no cover
 
-    async def __aenter__(self) -> 'GitHub':
+    async def __aenter__(self) -> "GitHub":
         return self
 
     async def __aexit__(self,
@@ -72,47 +75,39 @@ class GitHub:
         await self.session_ant_man.close()
 
     async def get(self, path: str):
-        # print(f"GET {path}")
-        async with self.session_ant_man.get(f"https://api.github.com{path}") as response:
+        async with self.session_ant_man.get(self._api_url(path)) as response:
             result = await response.json()
-            # print(result)
             return result
 
     async def get_flash(self, path: str):
-        # print(f"GET {path}")
-        async with self.session_flash.get(f"https://api.github.com{path}") as response:
+        async with self.session_flash.get(self._api_url(path)) as response:
             result = await response.json()
-            # print(result)
             return result
 
     async def post(self, path: str, json):
-        # print(f"POST {path}")
-        async with self.session_ant_man.post(f"https://api.github.com{path}", json=json) as response:
+        async with self.session_ant_man.post(self._api_url(path), json=json) as response:
             result = await response.json()
-            # print(result)
             return result
 
     async def post_flash(self, path: str, json):
-        # print(f"POST {path}")
-        async with self.session_flash.post(f"https://api.github.com{path}", json=json) as response:
+        async with self.session_flash.post(self._api_url(path), json=json) as response:
             result = await response.json()
-            # print(result)
             return result
 
     async def get_deployments(self) -> list:
         try:
-            return sorted(await self.get(f'/repos/{self.repo_path}/deployments'), key=lambda e: e["id"], reverse=True)
+            return sorted(await self.get(f"/repos/{self.repo_path}/deployments"), key=lambda e: e["id"], reverse=True)
         except TypeError:
             return []
 
     async def get_deployment_statuses(self, deployment_id: int) -> list:
-        return sorted(await self.get(f'/repos/{self.repo_path}/deployments/{deployment_id}/statuses'),
+        return sorted(await self.get(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"),
                       key=lambda e: e["id"],
                       reverse=True)
 
     async def create_deployment(self, ref: str, environment: str, transient: bool, production: bool, task: str,
                                 description: str):
-        return await self.post(f'/repos/{self.repo_path}/deployments', {
+        return await self.post(f"/repos/{self.repo_path}/deployments", {
             "ref": ref,
             "auto_merge": False,
             "environment": environment,
@@ -125,7 +120,7 @@ class GitHub:
 
     async def create_deployment_status(self, deployment_id: int, state: DeploymentState, environment: str,
                                        description: str):
-        return await self.post_flash(f'/repos/{self.repo_path}/deployments/{deployment_id}/statuses', {
+        return await self.post_flash(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses", {
             "state": state.name,
             "description": description,
             "environment": environment,
@@ -204,18 +199,18 @@ class GitHub:
 
     async def deploy(self, environment: str, ref: str, transient: bool, production: bool, task: str, description: str):
         print_info("Creating deployment")
-        tmp = await self.create_deployment(ref=ref,
-                                           environment=environment,
-                                           transient=transient,
-                                           production=production,
-                                           task=task,
-                                           description=description)
-        if "id" not in tmp:
-            print(tmp)
+        deployment_creation_result = await self.create_deployment(ref=ref,
+                                                                  environment=environment,
+                                                                  transient=transient,
+                                                                  production=production,
+                                                                  task=task,
+                                                                  description=description)
+        if "id" not in deployment_creation_result:
+            print(deployment_creation_result)
             raise RuntimeError()
 
-        print(f"::set-output name=deployment_id::{tmp['id']}")
-        print_success(f"Deployment {tmp['id']} created")
+        print(f"::set-output name=deployment_id::{deployment_creation_result['id']}")
+        print_success(f"Deployment {deployment_creation_result['id']} created")
 
 
 _github_event_data = None
@@ -228,7 +223,8 @@ def read_github_event_data():
         return _github_event_data
 
     _github_event_data = dict()
-    if (github_event_path := os.environ.get("GITHUB_EVENT_PATH")) and os.path.exists(github_event_path):
+    github_event_path = os.environ.get("GITHUB_EVENT_PATH")  # TODO: Use walrus operator when flake8 supports it
+    if github_event_path and os.path.exists(github_event_path):
         print_info("Found GitHub Event Path")
         with open(github_event_path, "r") as f:
             _github_event_data = json.load(f)

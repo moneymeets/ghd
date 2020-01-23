@@ -12,6 +12,33 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Set up Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+
+      - name: Install Poetry
+        run: pip install poetry==$POETRY_VERSION
+        env:
+          POETRY_VERSION: 1.0.2
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v1
+        id: poetry-cache
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ hashFiles('**/poetry.lock') }}
+      - name: Install Dependencies
+        if: steps.poetry-cache.outputs.cache-hit != 'true'
+        run: |
+          cd docker && poetry install
+
+      - name: Lint
+        run: |
+          cd docker && poetry run flake8
+
       - name: Build and publish image
         run: |
           # For branch names other than master (e.g. feature/test), append last branch name component (test) to the tag

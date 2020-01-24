@@ -2,6 +2,7 @@
 import asyncio
 import os
 from functools import wraps
+from typing import List
 
 import click
 import colorama
@@ -87,16 +88,31 @@ async def cmd_list(repo: str, verbose: bool, limit: int):
               default="Deployed via GHD",
               prompt=True,
               help="Deployment description")
+@click.option("-c", "--require-context",
+              multiple=True,
+              default=["+"],
+              help="Context required to be in success state for this deployment to run; "
+                   "use a single '-' to require no contexts, or a single '+' to require all")
 @coroutine
 async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient: bool, production: bool,
-                     description: str):
+                     description: str, require_context: List[str]):
+    if "-" in require_context:
+        if len(require_context) != 1:
+            raise RuntimeError("When not requiring any context by using '-', no other contexts must be required")
+        require_context = []
+    elif "+" in require_context:
+        if len(require_context) != 1:
+            raise RuntimeError("When requiring all contexts by using '+', no other contexts must be required")
+        require_context = None
+
     async with GitHub(repo_path=repo) as gh:
         await gh.deploy(environment=environment,
                         ref=ref or os.environ.get("GITHUB_SHA"),
                         transient=transient,
                         production=production,
                         task=task,
-                        description=description)
+                        description=description,
+                        required_contexts=require_context)
 
 
 @main_group.command(name="set-state", short_help="Set deployment state")

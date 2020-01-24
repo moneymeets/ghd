@@ -2,6 +2,7 @@ import enum
 import json
 import os
 import sys
+from typing import List, Optional
 
 import aiohttp
 import colorama
@@ -106,7 +107,7 @@ class GitHub:
                       reverse=True)
 
     async def create_deployment(self, ref: str, environment: str, transient: bool, production: bool, task: str,
-                                description: str):
+                                description: str, required_contexts: Optional[List[str]]):
         return await self.post(f"/repos/{self.repo_path}/deployments", {
             "ref": ref,
             "auto_merge": False,
@@ -115,7 +116,7 @@ class GitHub:
             "production_environment": production,
             "task": task,
             "description": description,
-            "required_contexts": [],  # TODO
+            "required_contexts": required_contexts,
         })
 
     async def create_deployment_status(self, deployment_id: int, state: DeploymentState, environment: str,
@@ -197,14 +198,16 @@ class GitHub:
 
         print(tabulate.tabulate(tbl, headers="keys"))
 
-    async def deploy(self, environment: str, ref: str, transient: bool, production: bool, task: str, description: str):
+    async def deploy(self, environment: str, ref: str, transient: bool, production: bool, task: str, description: str,
+                     required_contexts: Optional[List[str]]):
         print_info("Creating deployment")
         deployment_creation_result = await self.create_deployment(ref=ref,
                                                                   environment=environment,
                                                                   transient=transient,
                                                                   production=production,
                                                                   task=task,
-                                                                  description=description)
+                                                                  description=description,
+                                                                  required_contexts=required_contexts)
         if "id" not in deployment_creation_result:
             print(deployment_creation_result)
             raise RuntimeError()

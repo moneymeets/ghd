@@ -1,4 +1,3 @@
-import os
 import re
 import subprocess
 
@@ -12,9 +11,18 @@ def short_sha(ref: str) -> str:
         return ref
 
 
+def get_head_rev():
+    exit_code, output = subprocess.getstatusoutput("git rev-parse HEAD")
+    return output if exit_code == 0 else None
+
+
 def get_repo_from_git():
+    exit_code, output = subprocess.getstatusoutput("git remote -v")
+    if exit_code != 0:
+        return None
+
     try:
-        urls = set([line.split()[1] for line in subprocess.getoutput("git remote -v").splitlines()])
+        urls = set([line.split()[1] for line in output.splitlines()])
     except IndexError:
         return None
 
@@ -45,17 +53,8 @@ def deep_dict_get(d: dict, *path):
 
 
 def get_repo_fallback(github_event_data):
-    return (os.environ.get("GITHUB_REPOSITORY")
-            or deep_dict_get(github_event_data, "repository", "full_name")
+    return (deep_dict_get(github_event_data, "repository", "full_name")
             or get_repo_from_git())
-
-
-def get_repo_or_fallback(repo: str, github_event_data):
-    return (repo
-            or os.environ.get("GITHUB_REPOSITORY")
-            or deep_dict_get(github_event_data, "repository", "full_name")
-            or get_repo_from_git()
-            )
 
 
 def bool_to_str(b):

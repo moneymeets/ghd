@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import asyncio
-import os
 from functools import wraps
 from typing import List
 
 import click
 import colorama
 from github import DeploymentState, GitHub, get_current_deployment_id, get_current_environment, read_github_event_data
-from util import get_repo_fallback
+from util import get_head_rev, get_repo_fallback
 
 
 def coroutine(f):
@@ -19,10 +18,10 @@ def coroutine(f):
 
 
 def click_repo_option():
-    repo_path = get_repo_fallback(read_github_event_data())
     return click.option("-r", "--repo",
-                        required=repo_path is None,
-                        default=repo_path,
+                        envvar="GITHUB_REPOSITORY",
+                        required=True,
+                        default=get_repo_fallback(read_github_event_data()),
                         help="Repository to use, e.g. moneymeets/ghd")
 
 
@@ -42,10 +41,8 @@ def main_group():
 
 @main_group.command(name="list", short_help="List deployments")
 @click_repo_option()
-@click.option("-v", "--verbose",
+@click.option("-v", "--verbose/--no-verbose",
               required=False,
-              is_flag=True,
-              flag_value=True,
               default=False,
               help="Print deployment states (slow)")
 @click.option("-l", "--limit",
@@ -62,6 +59,9 @@ async def cmd_list(repo: str, verbose: bool, limit: int):
 @click_repo_option()
 @click.option("-R", "--ref",
               required=True,
+              prompt=True,
+              envvar="GITHUB_SHA",
+              default=lambda: get_head_rev(),
               help="Reference to create the deployment from")
 @click.option("-e", "--environment",
               required=True,
@@ -70,17 +70,13 @@ async def cmd_list(repo: str, verbose: bool, limit: int):
 @click.option("-T", "--task",
               default="deploy",
               help="Deployment task")
-@click.option("-t", "--transient",
+@click.option("-t", "--transient/--no-transient",
               required=False,
-              is_flag=True,
-              flag_value=True,
               prompt=True,
               default=False,
               help="Mark as transient environment")
-@click.option("-p", "--production",
+@click.option("-p", "--production/--no-production",
               required=False,
-              is_flag=True,
-              flag_value=True,
               prompt=True,
               default=False,
               help="Mark as production environment")
@@ -107,7 +103,7 @@ async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient
 
     async with GitHub(repo_path=repo) as gh:
         await gh.deploy(environment=environment,
-                        ref=ref or os.environ.get("GITHUB_SHA"),
+                        ref=ref,
                         transient=transient,
                         production=production,
                         task=task,

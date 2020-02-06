@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Link me into your $PATH as `ln -s ../path/to/ghd`
+
+script_path() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        READLINK="readlink"
+    else
+        READLINK="readlink -f"
+    fi
+
+    local resolved="$($READLINK "${BASH_SOURCE[0]}")"
+    echo "$(dirname "$resolved")"
+}
+
+current_dir="$(pwd -P)"
+
+cd "$(script_path)"
+
+set +e
+
+poetry run bash -c " cd \"$current_dir\" && ghd $@ "

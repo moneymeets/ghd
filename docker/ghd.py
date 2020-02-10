@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 from functools import wraps
-from typing import List
+from typing import List, Optional
 
 import click
 import colorama
@@ -53,7 +53,7 @@ def main_group():
               required=False,
               help="Filter by environment")
 @coroutine
-async def cmd_list(repo: str, verbose: bool, limit: int, environment: str):
+async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[str]):
     async with GitHub(repo_path=repo) as gh:
         await gh.list(limit=limit, verbose=verbose, environment=environment)
 
@@ -129,7 +129,7 @@ async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient
               default="Deployed via GHD",
               help="Deployment description")
 @coroutine
-async def cmd_set_state(repo: str, environment: str, deployment_id: int, state: str, description: str):
+async def cmd_set_state(repo: str, environment: str, deployment_id: int, state: str, description: Optional[str]):
     async with GitHub(repo_path=repo) as gh:
         await gh.create_deployment_status(deployment_id=deployment_id,
                                           state=DeploymentState[state],

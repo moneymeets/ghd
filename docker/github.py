@@ -20,6 +20,7 @@ class DeploymentState(enum.Enum):
     in_progress = enum.auto()
     queued = enum.auto()
     success = enum.auto()
+    inactive = enum.auto()
 
 
 class GitHub:
@@ -96,7 +97,7 @@ class GitHub:
             result = await response.json()
             return result
 
-    async def get_deployments(self, environment: str) -> list:
+    async def get_deployments(self, environment: Optional[str]) -> list:
         try:
             path = f"/repos/{self.repo_path}/deployments"
             if environment:
@@ -126,13 +127,15 @@ class GitHub:
 
     async def create_deployment_status(self, deployment_id: int, state: DeploymentState, environment: str,
                                        description: str):
-        return await self.post_flash(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses", {
+        post_fn = self.post_flash if state != DeploymentState.inactive else self.post
+
+        return await post_fn(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses", {
             "state": state.name,
             "description": description,
             "environment": environment,
         })
 
-    async def list(self, limit: int, verbose: bool, environment: str):
+    async def list(self, limit: int, verbose: bool, environment: Optional[str]):
         assert limit > 0
 
         tbl = {

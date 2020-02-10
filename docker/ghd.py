@@ -49,10 +49,13 @@ def main_group():
               required=False,
               default=10,
               help="How many deployments to list")
+@click.option("-e", "--environment",
+              required=False,
+              help="Filter by environment")
 @coroutine
-async def cmd_list(repo: str, verbose: bool, limit: int):
+async def cmd_list(repo: str, verbose: bool, limit: int, environment: str):
     async with GitHub(repo_path=repo) as gh:
-        await gh.list(limit=limit, verbose=verbose)
+        await gh.list(limit=limit, verbose=verbose, environment=environment)
 
 
 @main_group.command(name="deploy", short_help="Create new deployment")

@@ -3,6 +3,7 @@ import json
 import os
 import sys
 from typing import List, Optional
+from urllib.parse import urlencode
 
 import aiohttp
 import colorama
@@ -95,9 +96,13 @@ class GitHub:
             result = await response.json()
             return result
 
-    async def get_deployments(self) -> list:
+    async def get_deployments(self, environment: str) -> list:
         try:
-            return sorted(await self.get(f"/repos/{self.repo_path}/deployments"), key=lambda e: e["id"], reverse=True)
+            path = f"/repos/{self.repo_path}/deployments"
+            if environment:
+                environment_param = urlencode({"environment": environment})
+                path += f"?{environment_param}"
+            return sorted(await self.get(path), key=lambda e: e["id"], reverse=True)
         except TypeError:
             return []
 
@@ -127,7 +132,7 @@ class GitHub:
             "environment": environment,
         })
 
-    async def list(self, limit: int, verbose: bool):
+    async def list(self, limit: int, verbose: bool, environment: str):
         assert limit > 0
 
         tbl = {
@@ -144,7 +149,7 @@ class GitHub:
             "description": [],
         }
 
-        for deployment in progressbar.progressbar((await self.get_deployments())[:limit], widgets=[
+        for deployment in progressbar.progressbar((await self.get_deployments(environment))[:limit], widgets=[
             progressbar.SimpleProgress(),
             " ",
             progressbar.Bar(marker="=", left="[", right="]"),

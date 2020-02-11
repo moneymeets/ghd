@@ -1,7 +1,24 @@
 import re
 import subprocess
+from functools import wraps
 
-from output import color_error, color_success, color_unknown
+from output import color_error, color_success, color_unknown, print_error
+
+
+class Error(Exception):
+    exit_code = 1
+
+
+def handle_errors(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Error as error:
+            print_error(str(error))
+            exit(error.exit_code)
+
+    return wrapped
 
 
 def short_sha(ref: str) -> str:

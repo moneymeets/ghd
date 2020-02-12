@@ -6,7 +6,9 @@ from typing import List, Optional
 import click
 import colorama
 from github import DeploymentState, GitHub, get_current_deployment_id, get_current_environment, read_github_event_data
-from util import get_head_rev, get_repo_fallback, handle_errors
+from output import print_info
+from util import DependentOptionDefault, bool_to_str, get_commit_subject, get_head_rev, get_repo_fallback, \
+    handle_errors, parse_require_context
 
 ORDERED_ENVIRONMENTS = ("dev", "test", "live")
 
@@ -88,7 +90,9 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
               default=False,
               help="Mark as production environment")
 @click.option("-d", "--description",
-              default="Deployed via GHD",
+              cls=DependentOptionDefault,
+              depends_on="ref",
+              default=lambda ref: get_commit_subject(ref) or "Deployed via GHD",
               prompt=True,
               help="Deployment description")
 @click.option("-c", "--require-context",
@@ -105,14 +109,15 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
 @coroutine
 async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient: bool, production: bool,
                      description: str, require_context: List[str], check_constraints: bool):
-    if "-" in require_context:
-        if len(require_context) != 1:
-            raise RuntimeError("When not requiring any context by using '-', no other contexts must be required")
-        require_context = []
-    elif "+" in require_context:
-        if len(require_context) != 1:
-            raise RuntimeError("When requiring all contexts by using '+', no other contexts must be required")
-        require_context = None
+    require_context, require_context_str = parse_require_context(require_context)
+
+    print_info(f"{repo}@{ref} will be deployed to {environment}")
+    print(f"  transient          {bool_to_str(transient)}")
+    print(f"  production         {bool_to_str(production)}")
+    print(f"  required contexts  {require_context_str}")
+    print(f"  description        {description}")
+    if not click.confirm("Start deployment?"):
+        return
 
     async with GitHub(repo_path=repo) as gh:
         if check_constraints:

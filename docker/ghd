@@ -19,4 +19,4 @@ cd "$(script_path)"
 
 set +e
 
-poetry run bash -c " cd \"$current_dir\" && ghd $@ "
+poetry run bash -c " cd \"$current_dir\" && ghd \"\$@\"" -- "$@"

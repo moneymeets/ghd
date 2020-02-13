@@ -2,7 +2,7 @@ import enum
 import json
 import os
 import sys
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from urllib.parse import urlencode
 
 import aiohttp
@@ -10,7 +10,11 @@ import colorama
 import progressbar
 import tabulate
 from output import color_str, color_unknown, print_info, print_success
-from util import bool_to_str, deep_dict_get, short_sha
+from util import Error, bool_to_str, deep_dict_get, short_sha
+
+
+class ConstraintError(Error):
+    pass
 
 
 class DeploymentState(enum.Enum):
@@ -106,6 +110,18 @@ class GitHub:
             return sorted(await self.get(path), key=lambda e: e["id"], reverse=True)
         except TypeError:
             return []
+
+    async def verify_ref_is_deployed_in_previous_environment(self, ref: str, environment: str,
+                                                             ordered_environments: Tuple[str]):
+        index = ordered_environments.index(environment)
+        previous_environment = ordered_environments[index - 1] if index != 0 else None
+
+        if previous_environment is not None and not any(
+                ref == deployment["ref"]
+                for deployment in await self.get_deployments(previous_environment)
+        ):
+            raise ConstraintError(
+                f"Deployment of {ref} to {environment} failed, because deployment to {previous_environment} is missing")
 
     async def get_deployment_statuses(self, deployment_id: int) -> list:
         return sorted(await self.get(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"),

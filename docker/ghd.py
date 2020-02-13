@@ -6,7 +6,9 @@ from typing import List, Optional
 import click
 import colorama
 from github import DeploymentState, GitHub, get_current_deployment_id, get_current_environment, read_github_event_data
-from util import get_head_rev, get_repo_fallback
+from util import get_head_rev, get_repo_fallback, handle_errors
+
+ORDERED_ENVIRONMENTS = ("dev", "test", "live")
 
 
 def coroutine(f):
@@ -51,6 +53,7 @@ def main_group():
               help="How many deployments to list")
 @click.option("-e", "--environment",
               required=False,
+              type=click.Choice(choices=ORDERED_ENVIRONMENTS),
               help="Filter by environment")
 @coroutine
 async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[str]):
@@ -69,6 +72,7 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
 @click.option("-e", "--environment",
               required=True,
               prompt=True,
+              type=click.Choice(choices=ORDERED_ENVIRONMENTS),
               help="Environment name")
 @click.option("-T", "--task",
               default="deploy",
@@ -92,9 +96,15 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
               default=["+"],
               help="Context required to be in success state for this deployment to run; "
                    "use a single '-' to require no contexts, or a single '+' to require all")
+@click.option("-C", "--check-constraints/--no-check-constraints",
+              required=False,
+              prompt=True,
+              default=True,
+              help="Check constraints before deployments, e.g. environment restrictions")
+@handle_errors
 @coroutine
 async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient: bool, production: bool,
-                     description: str, require_context: List[str]):
+                     description: str, require_context: List[str], check_constraints: bool):
     if "-" in require_context:
         if len(require_context) != 1:
             raise RuntimeError("When not requiring any context by using '-', no other contexts must be required")
@@ -105,6 +115,9 @@ async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient
         require_context = None
 
     async with GitHub(repo_path=repo) as gh:
+        if check_constraints:
+            await gh.verify_ref_is_deployed_in_previous_environment(ref, environment, ORDERED_ENVIRONMENTS)
+
         await gh.deploy(environment=environment,
                         ref=ref,
                         transient=transient,
@@ -119,6 +132,7 @@ async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient
 @click.option("-e", "--environment",
               required=True,
               default=get_current_environment(),
+              type=click.Choice(choices=ORDERED_ENVIRONMENTS),
               help="Environment name")
 @click_deployment_id_option()
 @click.option("-s", "--state",

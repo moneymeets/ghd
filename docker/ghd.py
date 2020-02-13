@@ -7,8 +7,8 @@ import click
 import colorama
 from github import DeploymentState, GitHub, get_current_deployment_id, get_current_environment, read_github_event_data
 from output import print_info
-from util import DependentOptionDefault, bool_to_str, get_commit_subject, get_head_rev, get_repo_fallback, \
-    handle_errors, parse_require_context
+from util import DependentOptionDefault, bool_to_str, get_commit_subject, get_commit_tags, get_head_rev, \
+    get_repo_fallback, handle_errors, parse_require_context
 
 ORDERED_ENVIRONMENTS = ("dev", "test", "live")
 
@@ -111,7 +111,11 @@ async def cmd_deploy(repo: str, ref: str, environment: str, task: str, transient
                      description: str, require_context: List[str], check_constraints: bool):
     require_context, require_context_str = parse_require_context(require_context)
 
-    print_info(f"{repo}@{ref} will be deployed to {environment}")
+    tags = ", ".join(get_commit_tags(ref))
+    if tags:
+        tags = f" ({tags})"
+
+    print_info(f"{repo}@{ref}{tags} will be deployed to {environment}")
     print(f"  transient          {bool_to_str(transient)}")
     print(f"  production         {bool_to_str(production)}")
     print(f"  required contexts  {require_context_str}")

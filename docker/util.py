@@ -40,6 +40,11 @@ def get_commit_subject(ref: str) -> Optional[str]:
     return output if exit_code == 0 else None
 
 
+def get_commit_tags(ref: str) -> List[str]:
+    exit_code, output = subprocess.getstatusoutput(f"git describe --tags {ref}")
+    return output.splitlines() if exit_code == 0 else []
+
+
 def get_repo_from_git():
     exit_code, output = subprocess.getstatusoutput("git remote -v")
     if exit_code != 0:

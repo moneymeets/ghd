@@ -41,7 +41,7 @@ def get_commit_subject(ref: str) -> Optional[str]:
 
 
 def get_commit_tags(ref: str) -> List[str]:
-    exit_code, output = subprocess.getstatusoutput(f"git describe --tags {ref}")
+    exit_code, output = subprocess.getstatusoutput(f"git describe --tags --exact-match {ref}")
     return output.splitlines() if exit_code == 0 else []
 
 

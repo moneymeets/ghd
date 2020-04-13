@@ -10,6 +10,7 @@ from output import print_info
 from util import DependentOptionDefault, bool_to_str, get_commit_subject, get_commit_tags, get_head_rev, \
     get_repo_fallback, handle_errors, parse_require_context
 
+PRODUCTION_ENVIRONMENTS = ("live",)
 ORDERED_ENVIRONMENTS = ("dev", "test", "live")
 
 
@@ -85,9 +86,11 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
               default=False,
               help="Mark as transient environment")
 @click.option("-p", "--production/--no-production",
+              cls=DependentOptionDefault,
+              depends_on="environment",
               required=False,
               prompt=True,
-              default=False,
+              default=lambda environment: environment in PRODUCTION_ENVIRONMENTS,
               help="Mark as production environment")
 @click.option("-d", "--description",
               cls=DependentOptionDefault,

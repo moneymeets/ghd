@@ -2,7 +2,7 @@ import enum
 import json
 import os
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence
 from urllib.parse import urlencode
 
 import aiohttp
@@ -112,7 +112,7 @@ class GitHub:
             return []
 
     async def verify_ref_is_deployed_in_previous_environment(self, ref: str, environment: str,
-                                                             ordered_environments: Tuple[str]):
+                                                             ordered_environments: Sequence[str]):
         index = ordered_environments.index(environment)
         previous_environment = ordered_environments[index - 1] if index != 0 else None
 

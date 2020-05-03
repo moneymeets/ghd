@@ -8,6 +8,7 @@ RUN set -ex \
     && pip install poetry \
     && poetry config virtualenvs.in-project true \
     && poetry install \
+    && poetry run nosetests \
     && apk del build-base libffi-dev openssl-dev \
     && rm -r ~/.cache
 

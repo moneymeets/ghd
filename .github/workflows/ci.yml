@@ -28,9 +28,9 @@ jobs:
         run: |
           cd docker && poetry install
 
-      - name: Lint
+      - name: Lint and test
         run: |
-          cd docker && poetry run flake8
+          cd docker && poetry run flake8 && poetry run nosetests
 
       - name: Build and publish image
         run: |

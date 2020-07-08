@@ -1,0 +1,2 @@
+class ExitApp(Exception):
+    pass

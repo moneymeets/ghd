@@ -143,12 +143,13 @@ async def cmd_deploy(
 
     async with GitHub(repo_path=repo) as gh:
         recent_deployment = await gh.get_recent_deployment(environment)
-        git_log = get_git_log(recent_deployment["ref"], ref)
+        recent_deployment_ref = recent_deployment["ref"] if recent_deployment else None
+        git_log = get_git_log(recent_deployment_ref, ref) if recent_deployment_ref else None
 
     print()
-    if git_log:
-        print(git_log)
-    elif recent_deployment["ref"] == ref:
+    if git_log is not None:
+        print("\n".join(git_log))
+    elif recent_deployment_ref == ref:
         print_info("This commit is currently deployed")
     else:
         print_info("First Deployment to this environment, not showing the commit list")

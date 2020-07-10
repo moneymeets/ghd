@@ -100,12 +100,13 @@ class GitHub:
         index = ordered_environments.index(environment)
         previous_environment = ordered_environments[index - 1] if index != 0 else None
 
-        if previous_environment is not None and not any(
-            ref == deployment["ref"] for deployment in await self.get_deployments(previous_environment)
-        ):
+        if previous_environment is not None and await self.is_deployed_in_environment(ref, previous_environment):
             raise ConstraintError(
                 f"Deployment of {ref} to {environment} failed, because deployment to {previous_environment} is missing",
             )
+
+    async def is_deployed_in_environment(self, ref: str, environment: str) -> bool:
+        return any(ref == deployment["ref"] for deployment in await self.get_deployments(ref, environment))
 
     async def get_deployment_statuses(self, deployment_id: int) -> list:
         return sorted(
@@ -113,6 +114,20 @@ class GitHub:
             key=lambda e: e["id"],
             reverse=True,
         )
+
+    async def get_commits_until(self, sha: str, until: str):
+        sha_arg = urlencode({"sha": sha})
+        commits = await self.get(f"/repos/{self.repo_path}/commits?{sha_arg}")
+        if "message" in commits:
+            raise KeyError
+        result = []
+        end_found = False
+        for commit in commits:
+            if commit["sha"] == until:
+                end_found = True
+                break
+            result.append(commit)
+        return result, end_found
 
     async def create_deployment(
         self,

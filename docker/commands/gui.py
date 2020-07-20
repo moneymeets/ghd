@@ -12,6 +12,7 @@ import colorama
 from github import GitHub
 from github.util import get_state_color, short_sha
 from saint import ExitApp
+from saint.messagebox import MessageBox
 from saint.multiview import MultiView
 from saint.popover import popover
 from saint.statusbar import StatusBar
@@ -19,13 +20,14 @@ from saint.table import Column, Table
 from saint.timer import Timer
 from saint.util import breadcrumbs, exit_app
 from saint.widget import Widget
-from .utils import localize_date
+from .utils import localize_date, PRODUCTION_ENVIRONMENTS, get_next_environment
 
 
 class ViewMode(enum.Enum):
     DEPLOYMENTS = enum.auto()
     REPOS = enum.auto()
     ENVIRONMENTS = enum.auto()
+    PROMOTE = enum.auto()
 
 
 def bool_to_str(b: Optional[bool], max_length: int):
@@ -119,6 +121,11 @@ class DeploymentsView(Widget):
         return (highlight if ref == self._selected_ref else "") + short_sha(ref, max_length)
 
 
+class PromoteView(MessageBox):
+    def __init__(self, parent_or_term: Widget):
+        super().__init__(parent_or_term, "", (("Yes", True), ("No", False)))
+
+
 class MainView(MultiView[ViewMode]):
     on_status_changed: Widget.Signal
 
@@ -128,7 +135,7 @@ class MainView(MultiView[ViewMode]):
 
         self._env_list = EnvironmentsList(self)
         self._env_list.on_item_selected += self.apply_environment_selection
-        self._env_list.on_item_selection_canceled += self.cancel_environment_selection
+        self._env_list.on_item_selection_canceled += self.show_deployments
         self.add(ViewMode.ENVIRONMENTS, self._env_list)
 
         self._repo_list = RepositoryList(self)
@@ -141,8 +148,14 @@ class MainView(MultiView[ViewMode]):
         self._deployments_view.on["q"] += exit_app
         self._deployments_view.on["r"] += self.reload_deployments
         self._deployments_view.on["s"] += self.show_repo_selection
+        self._deployments_view.on["p"] += self.show_promote_confirmation
         self._deployments_view.deployments_table.on_selection_changed += self.deployment_selection_changed
         self.add(ViewMode.DEPLOYMENTS, self._deployments_view)
+
+        self._promote_view = PromoteView(self)
+        self._promote_view.on_abort += self.show_deployments
+        self._promote_view.on_select += self.do_promote
+        self.add(ViewMode.PROMOTE, self._promote_view)
 
         self._watch_timer = Timer(5, self.refresh_statuses)
 
@@ -185,7 +198,7 @@ class MainView(MultiView[ViewMode]):
         self.show(ViewMode.DEPLOYMENTS)
         await self._reload_data()
 
-    async def cancel_environment_selection(
+    async def show_deployments(
         self, table: Table, key: blessed.keyboard.Keystroke,
     ):
         self.show(ViewMode.DEPLOYMENTS)
@@ -246,6 +259,118 @@ class MainView(MultiView[ViewMode]):
         self.show(ViewMode.REPOS)
         popover(self, "Loading repository list")
         self._repo_list.data = await self._gh.repositories
+        return True
+
+    async def do_promote(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
+        _, value = self._promote_view.choice
+        if not value:
+            await self.show_deployments(None, None)
+            return True
+
+        data = self._deployments_view.deployments_table.selected_data
+        env = data["environment"]
+        next_env = get_next_environment(env)
+        if not next_env:
+            return True
+        ref = data["ref"]
+        description = data["description"]
+        task = data["task"]
+
+        # no need to check if we're already deployed in the previous environment (which is env), as we are already
+        # promoting from that deployment
+
+        await self._gh.deploy(
+            environment=next_env,
+            ref=ref,
+            transient=False,
+            production=next_env in PRODUCTION_ENVIRONMENTS,
+            task=task,
+            description=description,
+            required_contexts=None,
+        )
+        await self.show_deployments(None, None)
+        return True
+
+    async def show_promote_confirmation(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
+        data = self._deployments_view.deployments_table.selected_data
+        if data is None:
+            return True
+
+        env = data["environment"]
+        next_env = get_next_environment(env)
+        if not next_env:
+            return True
+
+        self.show(ViewMode.PROMOTE)
+        ref = data["ref"]
+        description = data["description"]
+        creator = data["creator"]["login"]
+        created = localize_date(data["created_at"])
+        task = data["task"]
+
+        recent_deployment = await self._gh.get_recent_deployment(next_env)
+
+        if not recent_deployment:
+            git_log = colorama.Fore.CYAN + "First deployment to this environment" + colorama.Fore.RESET
+        else:
+            if recent_deployment["ref"] == ref:
+                git_log = colorama.Fore.CYAN + "No changes. This is a re-deployment." + colorama.Fore.RESET
+            else:
+                try:
+                    rollback = False
+                    commits, end_found = await self._gh.get_commits_until(ref, recent_deployment["ref"])
+                    if not end_found:
+                        # assume a possible rollback
+                        rollback = True
+                        commits, end_found = await self._gh.get_commits_until(recent_deployment["ref"], ref)
+                except KeyError:
+                    git_log = colorama.Fore.RED + "The commit was not found in the repository." + colorama.Fore.RESET
+                else:
+                    git_log_lines = (
+                        [
+                            colorama.Fore.YELLOW
+                            + "This is a rollback! The following commits will be REMOVED!"
+                            + colorama.Fore.RESET,
+                            "",
+                        ]
+                        if rollback
+                        else []
+                    )
+                    if not end_found:
+                        git_log_lines += [
+                            colorama.Fore.CYAN
+                            + "Commit list suppressed, too many commits to show."
+                            + colorama.Fore.RESET,
+                        ]
+                    else:
+
+                        def commit_to_oneline(commit):
+                            committer = commit["commit"]["committer"]
+                            author = committer["name"]
+                            committed = localize_date(committer["date"])
+                            message, *_ = commit["commit"]["message"].splitlines()
+                            sha = short_sha(commit["sha"])
+                            return f"[{sha}  {committed}  {author}]  {message}"
+
+                        git_log_lines += list(map(commit_to_oneline, commits))[::-1]
+
+                    git_log = "\n".join(git_log_lines)
+
+        self._promote_view.choice_index = 1  # default to "No"
+        self._promote_view.message = f"""Promote from {env} to {next_env}?
+
+Creator            {creator}
+Created            {created}
+Ref                {short_sha(ref)}
+Description        {description}
+Task               {task}
+Transient          {bool_to_str(False, 100)}{self.style.default}
+Production         {bool_to_str(next_env in PRODUCTION_ENVIRONMENTS, 100)}{self.style.default}
+Required Contexts  All
+Check constraints  {bool_to_str(True, 100)}{self.style.default}
+
+{git_log}"""
+
         return True
 
     def _fill_environments(self, *envs: str):

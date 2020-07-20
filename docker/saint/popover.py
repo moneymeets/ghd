@@ -1,18 +1,12 @@
 import textwrap
 
+from .util import draw_border_double
 from .widget import Widget
 
 
 def popover(widget: Widget, text: str):
     widget.clear_viewport()
-
-    widget.out(0, 0, widget.style.default, "╔", "═" * (widget.width - 2), "╗")
-    widget.out(
-        0, widget.height - 1, widget.style.default, "╚", "═" * (widget.width - 2), "╝",
-    )
-    for i in range(1, widget.height - 1):
-        widget.out(0, i, widget.style.default, "║")
-        widget.out(widget.width - 1, i, widget.style.default, "║")
+    draw_border_double(widget)
 
     lines = textwrap.wrap(text, widget.width - 4)
     offset_y = (widget.height - len(lines)) // 2

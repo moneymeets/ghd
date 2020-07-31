@@ -267,4 +267,11 @@ class GitHub:
 
     @property
     async def repositories(self):
-        return await self.get("/user/repos")
+        result = []
+        page = 1
+        while True:
+            repos = await self.get(f"/user/repos?page={page}")
+            if not repos:
+                return result
+            page += 1
+            result += repos

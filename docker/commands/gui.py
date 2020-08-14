@@ -10,13 +10,14 @@ import blessed.sequences
 import colorama
 
 from github import GitHub
-from github.util import get_state_color, short_sha
+from github.schema import Commit, Deployment, DeploymentStatus, Repository
+from github.util import get_state_color, short_sha, DeploymentState
 from saint import ExitApp
 from saint.messagebox import MessageBox
 from saint.multiview import MultiView
 from saint.popover import popover
 from saint.statusbar import StatusBar
-from saint.table import Column, Table
+from saint.table import Column, Table, TableT
 from saint.timer import Timer
 from saint.util import breadcrumbs, exit_app
 from saint.widget import Widget
@@ -39,11 +40,11 @@ def bool_to_str(b: Optional[bool], max_length: int):
         return colorama.Fore.RED + "no"[:max_length]
 
 
-def color_state(state: str, max_length: int):
-    return get_state_color(state) + state[:max_length]
+def color_state(state: DeploymentState, max_length: int):
+    return get_state_color(state) + state.value[:max_length]
 
 
-class SelectionTable(Table):
+class SelectionTable(Table[TableT]):
     on_item_selected: Widget.Signal
     on_item_selection_canceled: Widget.Signal
 
@@ -65,15 +66,15 @@ class EnvironmentsList(SelectionTable):
         super().__init__(parent)
 
 
-class RepositoryList(SelectionTable):
+class RepositoryList(SelectionTable[Repository]):
     columns = (
-        Column("Private", Column.getter("private", styler=bool_to_str)),
-        Column("Name", Column.getter("full_name")),
+        Column("Private", lambda row, max_length: bool_to_str(row.private, max_length)),
+        Column("Name", lambda row, max_length: row.full_name[:max_length]),
     )
 
     @property
     def current_repo(self):
-        return self.selected_data["full_name"]
+        return self.selected_data.full_name
 
     def __init__(self, parent: Widget):
         super().__init__(parent)
@@ -81,28 +82,31 @@ class RepositoryList(SelectionTable):
 
 
 class DeploymentsView(Widget):
+    deployments_table: Table[Deployment]
+    statuses_table: Table[DeploymentStatus]
+
     def __init__(self, parent: Widget):
         super().__init__(parent, False)
 
         self.deployments_table = Table(
             self,
-            Column("Created", Column.getter("created_at", styler=localize_date)),
-            Column("Creator", Column.getter("creator", "login")),
-            Column("Env", Column.getter("environment")),
-            Column("Trans", Column.getter("transient_environment", styler=bool_to_str)),
-            Column("Prod", Column.getter("production_environment", styler=bool_to_str)),
-            Column("Ref", Column.getter("ref", styler=self._ref_styler)),
-            Column("Task", Column.getter("task")),
-            Column("Description", Column.getter("description")),
+            Column("Created", lambda row, max_length: localize_date(row.created_at, max_length)),
+            Column("Creator", lambda row, max_length: row.creator.login[:max_length]),
+            Column("Env", lambda row, max_length: row.environment[:max_length]),
+            Column("Trans", lambda row, max_length: bool_to_str(row.transient_environment, max_length)),
+            Column("Prod", lambda row, max_length: bool_to_str(row.production_environment, max_length)),
+            Column("Ref", lambda row, max_length: self._ref_styler(row.ref, max_length)),
+            Column("Task", lambda row, max_length: row.task[:max_length]),
+            Column("Description", lambda row, max_length: row.description[:max_length]),
         )
         self.deployments_table.flex = 2
 
         self.statuses_table = Table(
             self,
-            Column("Created", Column.getter("created_at", styler=localize_date)),
-            Column("Creator", Column.getter("creator", "login")),
-            Column("State", Column.getter("state", styler=color_state)),
-            Column("Description", Column.getter("description")),
+            Column("Created", lambda row, max_length: localize_date(row.created_at, max_length)),
+            Column("Creator", lambda row, max_length: row.creator.login[:max_length]),
+            Column("State", lambda row, max_length: color_state(row.state, max_length)),
+            Column("Description", lambda row, max_length: row.description[:max_length]),
         )
 
         # neither "\t" nor ord("\t") work because - thanks to blessed - they're overwritten :/
@@ -114,7 +118,7 @@ class DeploymentsView(Widget):
         data = self.deployments_table.selected_data
         if not data:
             return None
-        return data["ref"]
+        return data.ref
 
     def _ref_styler(self, ref: str, max_length: int):
         highlight = colorama.Back.YELLOW + colorama.Fore.BLACK
@@ -240,9 +244,9 @@ class MainView(MultiView[ViewMode]):
             await self.on_status_changed(breadcrumbs(self._gh.repo_path, colorama.Fore.RED + "No Deployments"))
             return
 
-        deployment_id = selected["id"]
+        deployment_id = selected.id
         await self.on_status_changed(
-            breadcrumbs(self._gh.repo_path, f"Deployment {deployment_id}", selected["description"]),
+            breadcrumbs(self._gh.repo_path, f"Deployment {deployment_id}", selected.description),
         )
         cache_key = (self._gh.repo_path, deployment_id)
         if cache_key in self._cached_statuses and not force:
@@ -267,62 +271,53 @@ class MainView(MultiView[ViewMode]):
             await self.show_deployments(None, None)
             return True
 
-        data = self._deployments_view.deployments_table.selected_data
-        env = data["environment"]
-        next_env = get_next_environment(env)
+        deployment: Deployment = self._deployments_view.deployments_table.selected_data
+        next_env = get_next_environment(deployment.environment)
         if not next_env:
             return True
-        ref = data["ref"]
-        description = data["description"]
-        task = data["task"]
 
-        # no need to check if we're already deployed in the previous environment (which is env), as we are already
-        # promoting from that deployment
+        # no need to check if we're already deployed in the previous environment (which is deployment.environment),
+        # as we are already promoting from that deployment
 
         await self._gh.create_deployment(
-            ref=ref,
+            ref=deployment.ref,
             environment=next_env,
             transient=False,
             production=next_env in PRODUCTION_ENVIRONMENTS,
-            task=task,
-            description=description,
+            task=deployment.task,
+            description=deployment.description,
             required_contexts=None,
         )
         await self.show_deployments(None, None)
         return True
 
     async def show_promote_confirmation(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
-        data = self._deployments_view.deployments_table.selected_data
-        if data is None:
+        deployment: Optional[Deployment] = self._deployments_view.deployments_table.selected_data
+        if deployment is None:
             return True
 
-        env = data["environment"]
-        next_env = get_next_environment(env)
+        next_env = get_next_environment(deployment.environment)
         if not next_env:
             return True
 
         self.show(ViewMode.PROMOTE)
-        ref = data["ref"]
-        description = data["description"]
-        creator = data["creator"]["login"]
-        created = localize_date(data["created_at"])
-        task = data["task"]
+        created = localize_date(deployment.created_at)
 
         recent_deployment = await self._gh.get_recent_deployment(next_env)
 
         if not recent_deployment:
             git_log = colorama.Fore.CYAN + "First deployment to this environment" + colorama.Fore.RESET
         else:
-            if recent_deployment["ref"] == ref:
+            if recent_deployment.ref == deployment.ref:
                 git_log = colorama.Fore.CYAN + "No changes. This is a re-deployment." + colorama.Fore.RESET
             else:
                 try:
                     rollback = False
-                    commits, end_found = await self._gh.get_commits_until(ref, recent_deployment["ref"])
+                    commits, end_found = await self._gh.get_commits_until(deployment.ref, recent_deployment.ref)
                     if not end_found:
                         # assume a possible rollback
                         rollback = True
-                        commits, end_found = await self._gh.get_commits_until(recent_deployment["ref"], ref)
+                        commits, end_found = await self._gh.get_commits_until(recent_deployment.ref, deployment.ref)
                 except KeyError:
                     git_log = colorama.Fore.RED + "The commit was not found in the repository." + colorama.Fore.RESET
                 else:
@@ -344,12 +339,12 @@ class MainView(MultiView[ViewMode]):
                         ]
                     else:
 
-                        def commit_to_oneline(commit):
-                            committer = commit["commit"]["committer"]
-                            author = committer["name"]
-                            committed = localize_date(committer["date"])
-                            message, *_ = commit["commit"]["message"].splitlines()
-                            sha = short_sha(commit["sha"])
+                        def commit_to_oneline(commit: Commit):
+                            committer = commit.commit.committer
+                            author = committer.name
+                            committed = localize_date(committer.date)
+                            message, *_ = commit.commit.message.splitlines()
+                            sha = short_sha(commit.sha)
                             return f"[{sha}  {committed}  {author}]  {message}"
 
                         git_log_lines += list(map(commit_to_oneline, commits))[::-1]
@@ -357,13 +352,13 @@ class MainView(MultiView[ViewMode]):
                     git_log = "\n".join(git_log_lines)
 
         self._promote_view.choice_index = 1  # default to "No"
-        self._promote_view.message = f"""Promote from {env} to {next_env}?
+        self._promote_view.message = f"""Promote from {deployment.environment} to {next_env}?
 
-Creator            {creator}
+Creator            {deployment.creator.login}
 Created            {created}
-Ref                {short_sha(ref)}
-Description        {description}
-Task               {task}
+Ref                {short_sha(deployment.ref)}
+Description        {deployment.description}
+Task               {deployment.task}
 Transient          {bool_to_str(False, 100)}{self.style.default}
 Production         {bool_to_str(next_env in PRODUCTION_ENVIRONMENTS, 100)}{self.style.default}
 Required Contexts  All
@@ -377,7 +372,7 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
         self._env_list.data = [{"name": "<all>", "value": None}] + [{"name": name, "value": name} for name in envs]
 
     def update_environments_table(self):
-        envs = sorted({row["environment"] for row in self._deployments_view.deployments_table.data})
+        envs = sorted({row.environment for row in self._deployments_view.deployments_table.data})
         self._fill_environments(*envs)
 
 

@@ -1,10 +1,11 @@
 import os
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Tuple
 from urllib.parse import urlencode
 
 import aiohttp
 
 from util import Error
+from .schema import Deployment, DeploymentStatus, Commit, Repository
 from .util import DeploymentState
 
 
@@ -38,9 +39,15 @@ class GitHub:
             "Accept": "application/vnd.github.ant-man-preview+json",
         }
 
+        self.headers_v3 = {
+            **headers,
+            "Accept": "application/vnd.github.v3+json",
+        }
+
         self.repo_path = repo_path
         self.session_flash = aiohttp.ClientSession(headers=self.headers_flash, auth=auth)
         self.session_ant_man = aiohttp.ClientSession(headers=self.headers_ant_man, auth=auth)
+        self.session_v3 = aiohttp.ClientSession(headers=self.headers_v3, auth=auth)
 
     def __enter__(self) -> None:
         raise TypeError("Use async with instead")
@@ -55,14 +62,20 @@ class GitHub:
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.session_flash.close()
         await self.session_ant_man.close()
+        await self.session_v3.close()
 
-    async def get(self, path: str):
+    async def get_ant_man(self, path: str):
         async with self.session_ant_man.get(self._api_url(path)) as response:
             result = await response.json()
             return result
 
     async def get_flash(self, path: str):
         async with self.session_flash.get(self._api_url(path)) as response:
+            result = await response.json()
+            return result
+
+    async def get(self, path: str):
+        async with self.session_v3.get(self._api_url(path)) as response:
             result = await response.json()
             return result
 
@@ -76,17 +89,19 @@ class GitHub:
             result = await response.json()
             return result
 
-    async def get_deployments(self, environment: Optional[str]) -> list:
+    async def get_deployments(self, environment: Optional[str]) -> List[Deployment]:
         try:
             path = f"/repos/{self.repo_path}/deployments"
             if environment:
                 environment_param = urlencode({"environment": environment})
                 path += f"?{environment_param}"
-            return sorted(await self.get(path), key=lambda e: e["id"], reverse=True)
+            return sorted(
+                Deployment.schema().load(await self.get_ant_man(path), many=True), key=lambda e: e.id, reverse=True,
+            )
         except TypeError:
             return []
 
-    async def get_recent_deployment(self, environment: Optional[str]) -> Optional[dict]:
+    async def get_recent_deployment(self, environment: Optional[str]) -> Optional[Deployment]:
         deployments = await self.get_deployments(environment)
         return deployments[0] if deployments else None
 
@@ -102,24 +117,26 @@ class GitHub:
             )
 
     async def is_deployed_in_environment(self, ref: str, environment: str) -> bool:
-        return any(ref == deployment["ref"] for deployment in await self.get_deployments(environment))
+        return any(ref == deployment.ref for deployment in await self.get_deployments(environment))
 
-    async def get_deployment_statuses(self, deployment_id: int) -> list:
+    async def get_deployment_statuses(self, deployment_id: int) -> List[DeploymentStatus]:
         return sorted(
-            await self.get(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"),
-            key=lambda e: e["id"],
+            DeploymentStatus.schema().load(
+                await self.get_ant_man(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"), many=True,
+            ),
+            key=lambda e: e.id,
             reverse=True,
         )
 
-    async def get_commits_until(self, sha: str, until: str):
+    async def get_commits_until(self, sha: str, until: str) -> Tuple[List[Commit], bool]:
         sha_arg = urlencode({"sha": sha})
         commits = await self.get(f"/repos/{self.repo_path}/commits?{sha_arg}")
         if "message" in commits:
             raise KeyError
         result = []
         end_found = False
-        for commit in commits:
-            if commit["sha"] == until:
+        for commit in map(Commit.from_dict, commits):
+            if commit.sha == until:
                 end_found = True
                 break
             result.append(commit)
@@ -168,7 +185,7 @@ class GitHub:
         task: str,
         description: str,
         required_contexts: Optional[List[str]],
-    ):
+    ) -> int:
         deployment_creation_result = await self.create_deployment(
             ref=ref,
             environment=environment,
@@ -179,18 +196,19 @@ class GitHub:
             required_contexts=required_contexts,
         )
         if "id" not in deployment_creation_result:
-            print(deployment_creation_result)
-            raise RuntimeError()
+            raise RuntimeError
 
         return deployment_creation_result["id"]
 
     @property
-    async def repositories(self):
+    async def repositories(self) -> List[Repository]:
         result = []
-        page = 1
+        url = self._api_url("/user/repos")
         while True:
-            repos = await self.get(f"/user/repos?page={page}")
-            if not repos:
-                return result
-            page += 1
-            result += repos
+            async with self.session_v3.get(url) as response:
+                result += list(map(Repository.from_dict, await response.json()))
+
+                try:
+                    url = response.links.getone("next").getone("url")
+                except KeyError:
+                    return result

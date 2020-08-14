@@ -1,15 +1,11 @@
 import os
-import sys
 from typing import Any, List, Optional, Sequence
 from urllib.parse import urlencode
 
 import aiohttp
-import progressbar
-import tabulate
 
-from output import color_unknown, print_info, print_success
-from util import Error, bool_to_str
-from .util import DeploymentState, color_state, short_sha
+from util import Error
+from .util import DeploymentState
 
 
 class ConstraintError(Error):
@@ -106,7 +102,7 @@ class GitHub:
             )
 
     async def is_deployed_in_environment(self, ref: str, environment: str) -> bool:
-        return any(ref == deployment["ref"] for deployment in await self.get_deployments(ref, environment))
+        return any(ref == deployment["ref"] for deployment in await self.get_deployments(environment))
 
     async def get_deployment_statuses(self, deployment_id: int) -> list:
         return sorted(
@@ -163,81 +159,6 @@ class GitHub:
             {"state": state.name, "description": description, "environment": environment},
         )
 
-    async def list(self, limit: int, verbose: bool, environment: Optional[str]):
-        assert limit > 0
-
-        tbl = {
-            "id": [],
-            "ref": [],
-            "task": [],
-            "environment": [],
-            "creator": [],
-            "created": [],
-            "status_changed": [],
-            "transient": [],
-            "production": [],
-            "state": [],
-            "description": [],
-        }
-
-        for deployment in progressbar.progressbar(
-            (await self.get_deployments(environment))[:limit],
-            widgets=[
-                progressbar.SimpleProgress(),
-                " ",
-                progressbar.Bar(marker="=", left="[", right="]"),
-                " ",
-                progressbar.Timer(),
-            ],
-            prefix="Getting Deployments ",
-            fd=sys.stdout,
-        ):
-            tbl["ref"].append(short_sha(deployment["ref"]))
-            tbl["id"].append(deployment["id"])
-            env = deployment["environment"]
-            oenv = deployment["original_environment"]
-
-            tbl["environment"].append(env if env == oenv else f"{env} <- {oenv}")
-            tbl["creator"].append(deployment["creator"]["login"])
-            tbl["transient"].append(bool_to_str(deployment.get("transient_environment")))
-            tbl["production"].append(bool_to_str(deployment.get("production_environment")))
-            tbl["description"].append(deployment["description"])
-            tbl["created"].append(deployment["created_at"])
-            tbl["task"].append(deployment["task"])
-
-            if not verbose:
-                tbl["state"].append("?")
-                tbl["status_changed"].append("?")
-                continue
-
-            statuses = await self.get_deployment_statuses(deployment["id"])
-            if len(statuses) > 0:
-                status = statuses[0]
-                tbl["state"].append(color_state(status["state"]))
-                tbl["status_changed"].append(status["created_at"])
-            else:
-                tbl["state"].append(color_unknown("unknown"))
-                tbl["status_changed"].append(color_unknown("unknown"))
-
-        print(tabulate.tabulate(tbl, headers="keys"))
-
-    async def inspect(self, deployment_id: int):
-        tbl = {
-            "state": [],
-            "environment": [],
-            "creator": [],
-            "created": [],
-            "description": [],
-        }
-        for status in await self.get_deployment_statuses(deployment_id):
-            tbl["created"].append(status["created_at"])
-            tbl["state"].append(color_state(status["state"]))
-            tbl["environment"].append(status["environment"])
-            tbl["creator"].append(status["creator"]["login"])
-            tbl["description"].append(status["description"])
-
-        print(tabulate.tabulate(tbl, headers="keys"))
-
     async def deploy(
         self,
         environment: str,
@@ -248,7 +169,6 @@ class GitHub:
         description: str,
         required_contexts: Optional[List[str]],
     ):
-        print_info("Creating deployment")
         deployment_creation_result = await self.create_deployment(
             ref=ref,
             environment=environment,
@@ -262,8 +182,7 @@ class GitHub:
             print(deployment_creation_result)
             raise RuntimeError()
 
-        print(f"::set-output name=deployment_id::{deployment_creation_result['id']}")
-        print_success(f"Deployment {deployment_creation_result['id']} created")
+        return deployment_creation_result["id"]
 
     @property
     async def repositories(self):

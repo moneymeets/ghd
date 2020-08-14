@@ -279,9 +279,9 @@ class MainView(MultiView[ViewMode]):
         # no need to check if we're already deployed in the previous environment (which is env), as we are already
         # promoting from that deployment
 
-        await self._gh.deploy(
-            environment=next_env,
+        await self._gh.create_deployment(
             ref=ref,
+            environment=next_env,
             transient=False,
             production=next_env in PRODUCTION_ENVIRONMENTS,
             task=task,

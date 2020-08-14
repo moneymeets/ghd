@@ -1,6 +1,9 @@
+import sys
 from typing import List, Optional
 
 import click
+import progressbar
+import tabulate
 
 from github import DeploymentState, GitHub
 from github.util import (
@@ -9,8 +12,10 @@ from github.util import (
     get_current_environment,
     get_head_rev,
     get_git_log,
+    short_sha,
+    color_state,
 )
-from output import print_info
+from output import print_info, color_unknown, print_success
 from util import (
     DependentOptionDefault,
     bool_to_str,
@@ -49,8 +54,63 @@ def main_group():
 )
 @coroutine
 async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[str]):
+    assert limit > 0
+
     async with GitHub(repo_path=repo) as gh:
-        await gh.list(limit=limit, verbose=verbose, environment=environment)
+        tbl = {
+            "id": [],
+            "ref": [],
+            "task": [],
+            "environment": [],
+            "creator": [],
+            "created": [],
+            "status_changed": [],
+            "transient": [],
+            "production": [],
+            "state": [],
+            "description": [],
+        }
+
+        for deployment in progressbar.progressbar(
+            (await gh.get_deployments(environment))[:limit],
+            widgets=[
+                progressbar.SimpleProgress(),
+                " ",
+                progressbar.Bar(marker="=", left="[", right="]"),
+                " ",
+                progressbar.Timer(),
+            ],
+            prefix="Getting Deployments ",
+            fd=sys.stdout,
+        ):
+            tbl["ref"].append(short_sha(deployment["ref"]))
+            tbl["id"].append(deployment["id"])
+            env = deployment["environment"]
+            original_env = deployment["original_environment"]
+
+            tbl["environment"].append(env if env == original_env else f"{env} <- {original_env}")
+            tbl["creator"].append(deployment["creator"]["login"])
+            tbl["transient"].append(bool_to_str(deployment.get("transient_environment")))
+            tbl["production"].append(bool_to_str(deployment.get("production_environment")))
+            tbl["description"].append(deployment["description"])
+            tbl["created"].append(deployment["created_at"])
+            tbl["task"].append(deployment["task"])
+
+            if not verbose:
+                tbl["state"].append("?")
+                tbl["status_changed"].append("?")
+                continue
+
+            statuses = await gh.get_deployment_statuses(deployment["id"])
+            if len(statuses) > 0:
+                status = statuses[0]
+                tbl["state"].append(color_state(status["state"]))
+                tbl["status_changed"].append(status["created_at"])
+            else:
+                tbl["state"].append(color_unknown("unknown"))
+                tbl["status_changed"].append(color_unknown("unknown"))
+
+        print(tabulate.tabulate(tbl, headers="keys"))
 
 
 @main_group.command(name="deploy", short_help="Create new deployment")
@@ -158,13 +218,15 @@ async def cmd_deploy(
     if not click.confirm("Start deployment?"):
         return
 
+    print_info("Creating deployment")
+
     async with GitHub(repo_path=repo) as gh:
         if check_constraints:
             await gh.verify_ref_is_deployed_in_previous_environment(
                 ref, environment, ORDERED_ENVIRONMENTS,
             )
 
-        await gh.deploy(
+        deployment_id = await gh.deploy(
             environment=environment,
             ref=ref,
             transient=transient,
@@ -173,6 +235,9 @@ async def cmd_deploy(
             description=description,
             required_contexts=require_context,
         )
+
+        print(f"::set-output name=deployment_id::{deployment_id}")
+        print_success(f"Deployment {deployment_id} created")
 
 
 @main_group.command(name="set-state", short_help="Set deployment state")
@@ -208,7 +273,21 @@ async def cmd_set_state(
 @coroutine
 async def cmd_inspect(repo: str, deployment_id: int):
     async with GitHub(repo_path=repo) as gh:
-        await gh.inspect(deployment_id=deployment_id)
+        tbl = {
+            "state": [],
+            "environment": [],
+            "creator": [],
+            "created": [],
+            "description": [],
+        }
+        for status in await gh.get_deployment_statuses(deployment_id):
+            tbl["created"].append(status["created_at"])
+            tbl["state"].append(color_state(status["state"]))
+            tbl["environment"].append(status["environment"])
+            tbl["creator"].append(status["creator"]["login"])
+            tbl["description"].append(status["description"])
+
+        print(tabulate.tabulate(tbl, headers="keys"))
 
 
 @main_group.command(name="gui", short_help="Start interactive mode")

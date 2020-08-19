@@ -14,7 +14,6 @@ from output import print_info
 from util import (
     DependentOptionDefault,
     bool_to_str,
-    handle_errors,
     parse_require_context,
 )
 from .gui import gui_main
@@ -64,14 +63,6 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     default=lambda: get_head_rev(),
     help="Reference to create the deployment from",
 )
-@click.option(
-    "-e",
-    "--environment",
-    required=True,
-    prompt=True,
-    type=click.Choice(choices=ORDERED_ENVIRONMENTS),
-    help="Environment name",
-)
 @click.option("-T", "--task", default="deploy", help="Deployment task")
 @click.option(
     "-t",
@@ -108,26 +99,9 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     help="Context required to be in success state for this deployment to run; "
     "use a single '-' to require no contexts, or a single '+' to require all",
 )
-@click.option(
-    "-C",
-    "--check-constraints/--no-check-constraints",
-    required=False,
-    prompt=True,
-    default=True,
-    help="Check constraints before deployments, e.g. environment restrictions",
-)
-@handle_errors
 @coroutine
 async def cmd_deploy(
-    repo: str,
-    ref: str,
-    environment: str,
-    task: str,
-    transient: bool,
-    production: bool,
-    description: str,
-    require_context: List[str],
-    check_constraints: bool,
+    repo: str, ref: str, task: str, transient: bool, production: bool, description: str, require_context: List[str],
 ):
     require_context, require_context_str = parse_require_context(require_context)
 
@@ -135,14 +109,14 @@ async def cmd_deploy(
     if tags:
         tags = f" ({tags})"
 
-    print_info(f"{repo}@{ref}{tags} will be deployed to {environment}")
+    print_info(f"{repo}@{ref}{tags} will be deployed to dev")
     print(f"  transient          {bool_to_str(transient)}")
     print(f"  production         {bool_to_str(production)}")
     print(f"  required contexts  {require_context_str}")
     print(f"  description        {description}")
 
     async with GitHub(repo_path=repo) as gh:
-        recent_deployment = await gh.get_recent_deployment(environment)
+        recent_deployment = await gh.get_recent_deployment("dev")
         recent_deployment_ref = recent_deployment["ref"] if recent_deployment else None
         git_log = get_git_log(recent_deployment_ref, ref) if recent_deployment_ref else None
 
@@ -159,13 +133,8 @@ async def cmd_deploy(
         return
 
     async with GitHub(repo_path=repo) as gh:
-        if check_constraints:
-            await gh.verify_ref_is_deployed_in_previous_environment(
-                ref, environment, ORDERED_ENVIRONMENTS,
-            )
-
         await gh.deploy(
-            environment=environment,
+            environment="dev",
             ref=ref,
             transient=transient,
             production=production,

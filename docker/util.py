@@ -1,25 +1,8 @@
-from functools import wraps
 from typing import List, Optional, Tuple
 
 import click
 
-from output import color_error, color_success, color_unknown, print_error
-
-
-class Error(Exception):
-    exit_code = 1
-
-
-def handle_errors(func):
-    @wraps(func)
-    def wrapped(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Error as error:
-            print_error(str(error))
-            exit(error.exit_code)
-
-    return wrapped
+from output import color_error, color_success, color_unknown
 
 
 def deep_dict_get(d: dict, *path):

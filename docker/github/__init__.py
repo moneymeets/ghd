@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional
 from urllib.parse import urlencode
 
 import aiohttp
@@ -8,12 +8,8 @@ import progressbar
 import tabulate
 
 from output import color_unknown, print_info, print_success
-from util import Error, bool_to_str
+from util import bool_to_str
 from .util import DeploymentState, color_state, short_sha
-
-
-class ConstraintError(Error):
-    pass
 
 
 class GitHub:
@@ -93,20 +89,6 @@ class GitHub:
     async def get_recent_deployment(self, environment: Optional[str]) -> Optional[dict]:
         deployments = await self.get_deployments(environment)
         return deployments[0] if deployments else None
-
-    async def verify_ref_is_deployed_in_previous_environment(
-        self, ref: str, environment: str, ordered_environments: Sequence[str],
-    ):
-        index = ordered_environments.index(environment)
-        previous_environment = ordered_environments[index - 1] if index != 0 else None
-
-        if previous_environment is not None and await self.is_deployed_in_environment(ref, previous_environment):
-            raise ConstraintError(
-                f"Deployment of {ref} to {environment} failed, because deployment to {previous_environment} is missing",
-            )
-
-    async def is_deployed_in_environment(self, ref: str, environment: str) -> bool:
-        return any(ref == deployment["ref"] for deployment in await self.get_deployments(ref, environment))
 
     async def get_deployment_statuses(self, deployment_id: int) -> list:
         return sorted(

@@ -8,6 +8,10 @@ def breadcrumbs(*args) -> str:
     return " \u203a ".join(("",) + args)
 
 
+def bullet_join(*args) -> str:
+    return " \u2022 ".join(args)
+
+
 async def exit_app(widget, key) -> NoReturn:
     raise ExitApp
 

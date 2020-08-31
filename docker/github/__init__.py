@@ -13,6 +13,18 @@ class ConstraintError(Error):
     pass
 
 
+class GithubError(Error):
+    def __init__(self, message: str):
+        self.message = message
+
+    @classmethod
+    def raise_from_message(cls, payload: dict):
+        if not isinstance(payload, dict):
+            return
+        if message := payload.get("message"):
+            raise cls(message)
+
+
 class GitHub:
     @staticmethod
     def _api_url(path: str) -> str:
@@ -66,28 +78,23 @@ class GitHub:
 
     async def get_ant_man(self, path: str):
         async with self.session_ant_man.get(self._api_url(path)) as response:
-            result = await response.json()
-            return result
+            return await response.json()
 
     async def get_flash(self, path: str):
         async with self.session_flash.get(self._api_url(path)) as response:
-            result = await response.json()
-            return result
+            return await response.json()
 
     async def get(self, path: str):
         async with self.session_v3.get(self._api_url(path)) as response:
-            result = await response.json()
-            return result
+            return await response.json()
 
     async def post(self, path: str, json_data: Any):
         async with self.session_ant_man.post(self._api_url(path), json=json_data) as response:
-            result = await response.json()
-            return result
+            return await response.json()
 
     async def post_flash(self, path: str, json_data: Any):
         async with self.session_flash.post(self._api_url(path), json=json_data) as response:
-            result = await response.json()
-            return result
+            return await response.json()
 
     async def get_deployments(self, environment: Optional[str]) -> List[Deployment]:
         try:
@@ -128,11 +135,15 @@ class GitHub:
             reverse=True,
         )
 
+    async def get_commits(self) -> List[Commit]:
+        commits = await self.get(f"/repos/{self.repo_path}/commits")
+        GithubError.raise_from_message(commits)
+        return Commit.schema().load(commits, many=True)
+
     async def get_commits_until(self, sha: str, until: str) -> Tuple[List[Commit], bool]:
         sha_arg = urlencode({"sha": sha})
         commits = await self.get(f"/repos/{self.repo_path}/commits?{sha_arg}")
-        if "message" in commits:
-            raise KeyError
+        GithubError.raise_from_message(commits)
         result = []
         end_found = False
         for commit in map(Commit.from_dict, commits):
@@ -195,8 +206,10 @@ class GitHub:
             description=description,
             required_contexts=required_contexts,
         )
+        GithubError.raise_from_message(deployment_creation_result)
+
         if "id" not in deployment_creation_result:
-            raise RuntimeError
+            raise KeyError
 
         return deployment_creation_result["id"]
 

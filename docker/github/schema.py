@@ -39,7 +39,7 @@ class DeploymentStatus:
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
-class CommitSubject:
+class GitActor:
     name: str
     date: str
 
@@ -47,7 +47,8 @@ class CommitSubject:
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class CommitDetails:
-    committer: CommitSubject
+    committer: GitActor
+    author: GitActor
     message: str
 
 
@@ -56,6 +57,8 @@ class CommitDetails:
 class Commit:
     sha: str
     commit: CommitDetails
+    committer: Actor
+    author: Actor
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)

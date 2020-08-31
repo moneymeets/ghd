@@ -12,13 +12,13 @@ from util import deep_dict_get
 
 
 class DeploymentState(enum.Enum):
-    error = enum.auto()
-    failure = enum.auto()
-    pending = enum.auto()
-    in_progress = enum.auto()
-    queued = enum.auto()
-    success = enum.auto()
-    inactive = enum.auto()
+    error = "error"
+    failure = "failure"
+    pending = "pending"
+    in_progress = "in_progress"
+    queued = "queued"
+    success = "success"
+    inactive = "inactive"
 
 
 _github_event_data = None
@@ -47,19 +47,19 @@ def get_current_environment():
     return deep_dict_get(read_github_event_data(), "deployment", "environment")
 
 
-def get_state_color(state: str):
+def get_state_color(state: DeploymentState):
     return {
-        DeploymentState.pending.name: colorama.Fore.CYAN,
-        DeploymentState.queued.name: colorama.Fore.CYAN,
-        DeploymentState.success.name: colorama.Fore.GREEN,
-        DeploymentState.error.name: colorama.Fore.RED + colorama.Style.BRIGHT,
-        DeploymentState.failure.name: colorama.Fore.RED + colorama.Style.BRIGHT,
-        DeploymentState.in_progress.name: colorama.Fore.YELLOW,
+        DeploymentState.pending: colorama.Fore.CYAN,
+        DeploymentState.queued: colorama.Fore.CYAN,
+        DeploymentState.success: colorama.Fore.GREEN,
+        DeploymentState.error: colorama.Fore.RED + colorama.Style.BRIGHT,
+        DeploymentState.failure: colorama.Fore.RED + colorama.Style.BRIGHT,
+        DeploymentState.in_progress: colorama.Fore.YELLOW,
     }.get(state, colorama.Fore.BLUE)
 
 
-def color_state(state: str):
-    return color_str(get_state_color(state), state)
+def color_state(state: DeploymentState):
+    return color_str(get_state_color(state), state.value)
 
 
 def short_sha(ref: str, max_length: int = None) -> str:

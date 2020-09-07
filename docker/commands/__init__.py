@@ -124,7 +124,7 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     required=True,
     prompt=True,
     envvar="GITHUB_SHA",
-    default=lambda: get_head_rev(),
+    default=get_head_rev,
     help="Reference to create the deployment from",
 )
 @click.option(
@@ -132,6 +132,7 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     "--environment",
     required=True,
     prompt=True,
+    default=ORDERED_ENVIRONMENTS[0],
     type=click.Choice(choices=ORDERED_ENVIRONMENTS),
     help="Environment name",
 )

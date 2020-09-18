@@ -203,7 +203,7 @@ class MainView(MultiView[ViewMode]):
 
         self.on_view_switched += self._update_help
 
-    async def _update_help(self):
+    async def _update_help(self, view):
         select_abort = bullet_join("[enter] select", "[q] abort")
 
         text = {
@@ -215,7 +215,7 @@ class MainView(MultiView[ViewMode]):
             ViewMode.ENVIRONMENTS: select_abort,
             ViewMode.PROMOTE: select_abort,
             ViewMode.REPOS: select_abort,
-        }[self.current_view]
+        }[view.current_view]
 
         await self.on_status_changed(text)
 
@@ -230,7 +230,7 @@ class MainView(MultiView[ViewMode]):
                 self._repo_list, blessed.keyboard.Keystroke(),
             )
             await self.show(ViewMode.REPOS)
-        await self.on_view_switched()
+        await self.on_view_switched(self)
 
     async def _toggle_watch(self, widget: Widget, key: blessed.keyboard.Keystroke):
         if self._watch_timer.stopped:

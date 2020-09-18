@@ -210,7 +210,7 @@ class MainView(MultiView[ViewMode]):
             ViewMode.COMMITS: select_abort,
             ViewMode.DEPLOY: select_abort,
             ViewMode.DEPLOYMENTS: bullet_join(
-                "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[q]uit",
+                "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[w]atch", "[q]uit",
             ),
             ViewMode.ENVIRONMENTS: select_abort,
             ViewMode.PROMOTE: select_abort,

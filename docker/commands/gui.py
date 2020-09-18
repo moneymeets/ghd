@@ -201,9 +201,9 @@ class MainView(MultiView[ViewMode]):
 
         self.on["w"] += self._toggle_watch
 
-        self.on_view_switched += self._update_help
+        self.on_view_switched += self._view_switched
 
-    async def _update_help(self, view):
+    async def _view_switched(self, view):
         select_abort = bullet_join("[enter] select", "[q] abort")
 
         text = {
@@ -218,6 +218,9 @@ class MainView(MultiView[ViewMode]):
         }[view.current_view]
 
         await self.on_status_changed(text)
+
+        if view.current_view != ViewMode.DEPLOYMENTS:
+            self._watch_timer.stop()
 
     async def init(self):
         self._fill_environments()

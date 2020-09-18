@@ -344,6 +344,7 @@ class MainView(MultiView[ViewMode]):
             required_contexts=None,
         )
         await self.show_deployments(None, None)
+        await self._reload_data()
         return True
 
     async def do_deploy(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
@@ -370,6 +371,7 @@ class MainView(MultiView[ViewMode]):
             )
 
         await self.show_deployments(None, None)
+        await self._reload_data()
         return True
 
     async def _get_git_log_diff(self, env: str, ref: str):

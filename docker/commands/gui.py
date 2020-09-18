@@ -233,6 +233,9 @@ class MainView(MultiView[ViewMode]):
         await self.on_view_switched(self)
 
     async def _toggle_watch(self, widget: Widget, key: blessed.keyboard.Keystroke):
+        if self.current_view != ViewMode.DEPLOYMENTS:
+            return
+
         if self._watch_timer.stopped:
             self._watch_timer.start()
         else:

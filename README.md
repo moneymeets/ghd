@@ -3,7 +3,7 @@
 #### Personal GitHub Access Token
 
 To use `ghd` you need a personal GitHub access token. 
-To create this token, go to your profile settings and click on `Developer settings`. There you can find `Personal access tokens`. Create one with `repo_deployment` permissions then export your created token to use ghd.
+To create this token, go to your profile settings and click on `Developer settings`. There you can find `Personal access tokens`. Create one with `repo` permissions then export your created token to use ghd.
 ```
 export GITHUB_TOKEN=YourTokenHere
 ```

@@ -201,23 +201,26 @@ class MainView(MultiView[ViewMode]):
 
         self.on["w"] += self._toggle_watch
 
-        self.on_view_switched += self._update_help
+        self.on_view_switched += self._view_switched
 
-    async def _update_help(self):
+    async def _view_switched(self, view):
         select_abort = bullet_join("[enter] select", "[q] abort")
 
         text = {
             ViewMode.COMMITS: select_abort,
             ViewMode.DEPLOY: select_abort,
             ViewMode.DEPLOYMENTS: bullet_join(
-                "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[q]uit",
+                "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[w]atch", "[q]uit",
             ),
             ViewMode.ENVIRONMENTS: select_abort,
             ViewMode.PROMOTE: select_abort,
             ViewMode.REPOS: select_abort,
-        }[self.current_view]
+        }[view.current_view]
 
         await self.on_status_changed(text)
+
+        if view.current_view != ViewMode.DEPLOYMENTS:
+            self._watch_timer.stop()
 
     async def init(self):
         self._fill_environments()
@@ -230,9 +233,12 @@ class MainView(MultiView[ViewMode]):
                 self._repo_list, blessed.keyboard.Keystroke(),
             )
             await self.show(ViewMode.REPOS)
-        await self.on_view_switched()
+        await self.on_view_switched(self)
 
     async def _toggle_watch(self, widget: Widget, key: blessed.keyboard.Keystroke):
+        if self.current_view != ViewMode.DEPLOYMENTS:
+            return
+
         if self._watch_timer.stopped:
             self._watch_timer.start()
         else:
@@ -338,6 +344,7 @@ class MainView(MultiView[ViewMode]):
             required_contexts=None,
         )
         await self.show_deployments(None, None)
+        await self._reload_data()
         return True
 
     async def do_deploy(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
@@ -364,6 +371,7 @@ class MainView(MultiView[ViewMode]):
             )
 
         await self.show_deployments(None, None)
+        await self._reload_data()
         return True
 
     async def _get_git_log_diff(self, env: str, ref: str):

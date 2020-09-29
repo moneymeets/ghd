@@ -22,4 +22,4 @@ class MultiView(Widget, Generic[MultiViewKey]):
         self.current_view = view
         self.widgets = [self.views[view]]
         self.on_resize(self.width, self.height)
-        await self.on_view_switched()
+        await self.on_view_switched(self)

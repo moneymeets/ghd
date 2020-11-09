@@ -145,13 +145,13 @@ class GitHub:
         commits = await self.get(f"/repos/{self.repo_path}/commits?{sha_arg}")
         GithubError.raise_from_message(commits)
         result = []
-        end_found = False
+        commit_found = False
         for commit in map(Commit.from_dict, commits):
             if commit.sha == until:
-                end_found = True
+                commit_found = True
                 break
             result.append(commit)
-        return result, end_found
+        return result, commit_found
 
     async def create_deployment(
         self,

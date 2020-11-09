@@ -182,6 +182,7 @@ class MainView(MultiView[ViewMode]):
 
         self._commits = CommitSelection(self, self._deployments_view.deployments_table)
         self._commits.on["q"] += self.show_deployments
+        self._commits.on["r"] += self.reload_commits
         self._commits.on[curses.KEY_ENTER] += self.show_deploy_confirmation
         self.add(ViewMode.COMMITS, self._commits)
 
@@ -207,7 +208,7 @@ class MainView(MultiView[ViewMode]):
         select_abort = bullet_join("[enter] select", "[q] abort")
 
         text = {
-            ViewMode.COMMITS: select_abort,
+            ViewMode.COMMITS: bullet_join("[enter] select", "[q] abort", "[r]eload"),
             ViewMode.DEPLOY: select_abort,
             ViewMode.DEPLOYMENTS: bullet_join(
                 "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[w]atch", "[q]uit",
@@ -480,6 +481,11 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
     def update_environments_table(self):
         envs = sorted({row.environment for row in self._deployments_view.deployments_table.data})
         self._fill_environments(*envs)
+
+    async def reload_commits(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
+        popover(self, "Loading commits")
+        widget.data = await self._gh.get_commits()
+        return True
 
     async def show_commits(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         popover(self, "Loading commits")

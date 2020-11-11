@@ -4,7 +4,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    container: moneymeets/ruby-python-awscli:python3.8-poetry1.0-github
+    container: moneymeets/moneymeets-ci:latest
 
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

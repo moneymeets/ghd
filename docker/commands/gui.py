@@ -386,29 +386,33 @@ class MainView(MultiView[ViewMode]):
 
         try:
             rollback = False
-            commits, end_found = await self._gh.get_commits_until(ref, recent_deployment.ref)
-            if not end_found:
+            commits, deployment_ref_found = await self._gh.get_commits_until(ref, recent_deployment.ref)
+            if not deployment_ref_found:
                 # assume a possible rollback
                 rollback = True
-                commits, end_found = await self._gh.get_commits_until(recent_deployment.ref, ref)
+                commits, deployment_ref_found = await self._gh.get_commits_until(recent_deployment.ref, ref)
         except KeyError:
             return colorama.Fore.RED + "The commit was not found in the repository." + colorama.Fore.RESET
 
-        git_log_lines = (
-            [
+        if not deployment_ref_found:
+            git_log_lines = [
+                colorama.Fore.CYAN + "Commit list suppressed, too many commits to show." + colorama.Fore.RESET,
                 colorama.Fore.YELLOW
-                + "This is a rollback! The following commits will be REMOVED!"
+                + "Due to this, the update type (rollback or roll forward) could not be determined."
                 + colorama.Fore.RESET,
                 "",
             ]
-            if rollback
-            else []
-        )
-        if not end_found:
-            git_log_lines += [
-                colorama.Fore.CYAN + "Commit list suppressed, too many commits to show." + colorama.Fore.RESET,
-            ]
         else:
+            git_log_lines = (
+                [
+                    colorama.Fore.YELLOW
+                    + "This is a rollback! The following commits will be REMOVED!"
+                    + colorama.Fore.RESET,
+                    "",
+                ]
+                if rollback
+                else []
+            )
 
             def commit_to_oneline(commit: Commit):
                 committer = commit.commit.committer

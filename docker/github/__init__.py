@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Any, List, Optional, Sequence, Tuple
 from urllib.parse import urlencode
@@ -162,6 +163,7 @@ class GitHub:
         task: str,
         description: str,
         required_contexts: Optional[List[str]],
+        payload: Optional[Any] = None,
     ):
         return await self.post(
             f"/repos/{self.repo_path}/deployments",
@@ -174,6 +176,7 @@ class GitHub:
                 "task": task,
                 "description": description,
                 "required_contexts": required_contexts,
+                "payload": json.dumps(payload) if payload else "",
             },
         )
 
@@ -196,6 +199,7 @@ class GitHub:
         task: str,
         description: str,
         required_contexts: Optional[List[str]],
+        payload: Optional[Any] = None,
     ) -> int:
         deployment_creation_result = await self.create_deployment(
             ref=ref,
@@ -205,6 +209,7 @@ class GitHub:
             task=task,
             description=description,
             required_contexts=required_contexts,
+            payload=payload,
         )
         GithubError.raise_from_message(deployment_creation_result)
 

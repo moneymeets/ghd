@@ -117,9 +117,11 @@ class GitHub:
         self, ref: str, environment: str, ordered_environments: Sequence[str],
     ):
         index = ordered_environments.index(environment)
-        previous_environment = ordered_environments[index - 1] if index != 0 else None
+        if index == 0:
+            return
 
-        if previous_environment is not None and await self.is_deployed_in_environment(ref, previous_environment):
+        previous_environment = ordered_environments[index - 1]
+        if not await self.is_deployed_in_environment(ref, previous_environment):
             raise ConstraintError(
                 f"Deployment of {ref} to {environment} failed, because deployment to {previous_environment} is missing",
             )

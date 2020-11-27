@@ -204,6 +204,8 @@ class MainView(MultiView[ViewMode]):
 
         self.on_view_switched += self._view_switched
 
+        self._deploy_payload = {}
+
     async def _view_switched(self, view):
         select_abort = bullet_join("[enter] select", "[q] abort")
 
@@ -343,6 +345,7 @@ class MainView(MultiView[ViewMode]):
             task=deployment.task,
             description=deployment.description,
             required_contexts=None,
+            payload=self._deploy_payload,
         )
         await self.show_deployments(None, None)
         await self._reload_data()
@@ -365,6 +368,7 @@ class MainView(MultiView[ViewMode]):
                 task="deploy",
                 description=commit.commit.message.splitlines()[0],
                 required_contexts=None,
+                payload=self._deploy_payload,
             )
         except GithubError as ex:
             popover(
@@ -379,9 +383,15 @@ class MainView(MultiView[ViewMode]):
         recent_deployment = await self._gh.get_recent_deployment(env)
 
         if not recent_deployment:
+            self._deploy_payload = {
+                "ghd": {"type": "initial", "from_ref": "", "to_ref": ref},
+            }
             return colorama.Fore.CYAN + "First deployment to this environment" + colorama.Fore.RESET
 
         if recent_deployment.ref == ref:
+            self._deploy_payload = {
+                "ghd": {"type": "redeploy", "from_ref": ref, "to_ref": ref},
+            }
             return colorama.Fore.CYAN + "No changes. This is a re-deployment." + colorama.Fore.RESET
 
         try:
@@ -402,6 +412,9 @@ class MainView(MultiView[ViewMode]):
                 + colorama.Fore.RESET,
                 "",
             ]
+            self._deploy_payload = {
+                "ghd": {"type": "undefined", "from_ref": recent_deployment.ref, "to_ref": ref},
+            }
         else:
             git_log_lines = (
                 [
@@ -413,6 +426,13 @@ class MainView(MultiView[ViewMode]):
                 if rollback
                 else []
             )
+            self._deploy_payload = {
+                "ghd": {
+                    "type": "rollback" if rollback else "forward",
+                    "from_ref": recent_deployment.ref,
+                    "to_ref": ref,
+                },
+            }
 
             def commit_to_oneline(commit: Commit):
                 committer = commit.commit.committer

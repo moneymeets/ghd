@@ -2,12 +2,14 @@ import asyncio
 import concurrent.futures
 import curses
 import enum
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 import blessed
 import blessed.keyboard
 import blessed.sequences
 import colorama
+from dataclasses_json import dataclass_json
 
 from github import GitHub, GithubError
 from github.schema import Commit, Deployment, DeploymentStatus, Repository
@@ -32,6 +34,22 @@ class ViewMode(enum.Enum):
     COMMITS = enum.auto()
     PROMOTE = enum.auto()
     DEPLOY = enum.auto()
+
+
+class DeploymentType(enum.Enum):
+    INITIAL = "initial"
+    REDEPLOY = "redeploy"
+    ROLLBACK = "rollback"
+    FORWARD = "forward"
+    UNDEFINED = "undefined"
+
+
+@dataclass_json
+@dataclass
+class DeploymentPayload:
+    type: str  # cannot use "DeploymentType" directly here because it doesn't work with json.dumps
+    from_ref: str
+    to_ref: str
 
 
 def bool_to_str(b: Optional[bool], max_length: int):
@@ -204,7 +222,7 @@ class MainView(MultiView[ViewMode]):
 
         self.on_view_switched += self._view_switched
 
-        self._deploy_payload = {}
+        self._deployment_payload: Optional[DeploymentPayload] = None
 
     async def _view_switched(self, view):
         select_abort = bullet_join("[enter] select", "[q] abort")
@@ -345,8 +363,9 @@ class MainView(MultiView[ViewMode]):
             task=deployment.task,
             description=deployment.description,
             required_contexts=None,
-            payload=self._deploy_payload,
+            payload={"ghd": self._deployment_payload.to_dict()},
         )
+        self._deployment_payload = None
         await self.show_deployments(None, None)
         await self._reload_data()
         return True
@@ -368,31 +387,33 @@ class MainView(MultiView[ViewMode]):
                 task="deploy",
                 description=commit.commit.message.splitlines()[0],
                 required_contexts=None,
-                payload=self._deploy_payload,
+                payload={"ghd": self._deployment_payload.to_dict()},
             )
         except GithubError as ex:
             popover(
                 self, color_error(f"Failed to create deployment\n\n{ex.message}\n\n(press any key to continue)"), True,
             )
 
+        self._deployment_payload = None
+
         await self.show_deployments(None, None)
         await self._reload_data()
         return True
 
-    async def _get_git_log_diff(self, env: str, ref: str):
+    async def _get_git_log_diff(self, env: str, ref: str) -> Tuple[str, DeploymentPayload]:
         recent_deployment = await self._gh.get_recent_deployment(env)
 
         if not recent_deployment:
-            self._deploy_payload = {
-                "ghd": {"type": "initial", "from_ref": "", "to_ref": ref},
-            }
-            return colorama.Fore.CYAN + "First deployment to this environment" + colorama.Fore.RESET
+            return (
+                colorama.Fore.CYAN + "First deployment to this environment" + colorama.Fore.RESET,
+                DeploymentPayload(type=DeploymentType.INITIAL.value, from_ref="", to_ref=ref),
+            )
 
         if recent_deployment.ref == ref:
-            self._deploy_payload = {
-                "ghd": {"type": "redeploy", "from_ref": ref, "to_ref": ref},
-            }
-            return colorama.Fore.CYAN + "No changes. This is a re-deployment." + colorama.Fore.RESET
+            return (
+                colorama.Fore.CYAN + "No changes. This is a re-deployment." + colorama.Fore.RESET,
+                DeploymentPayload(type=DeploymentType.REDEPLOY.value, from_ref=ref, to_ref=ref),
+            )
 
         try:
             rollback = False
@@ -402,7 +423,10 @@ class MainView(MultiView[ViewMode]):
                 rollback = True
                 commits, deployment_ref_found = await self._gh.get_commits_until(recent_deployment.ref, ref)
         except KeyError:
-            return colorama.Fore.RED + "The commit was not found in the repository." + colorama.Fore.RESET
+            return (
+                colorama.Fore.RED + "The commit was not found in the repository." + colorama.Fore.RESET,
+                DeploymentPayload(type=DeploymentType.UNDEFINED.value, from_ref="", to_ref=ref),
+            )
 
         if not deployment_ref_found:
             git_log_lines = [
@@ -412,9 +436,10 @@ class MainView(MultiView[ViewMode]):
                 + colorama.Fore.RESET,
                 "",
             ]
-            self._deploy_payload = {
-                "ghd": {"type": "undefined", "from_ref": recent_deployment.ref, "to_ref": ref},
-            }
+            return (
+                "\n".join(git_log_lines),
+                DeploymentPayload(type=DeploymentType.UNDEFINED.value, from_ref=recent_deployment.ref, to_ref=ref),
+            )
         else:
             git_log_lines = (
                 [
@@ -426,13 +451,6 @@ class MainView(MultiView[ViewMode]):
                 if rollback
                 else []
             )
-            self._deploy_payload = {
-                "ghd": {
-                    "type": "rollback" if rollback else "forward",
-                    "from_ref": recent_deployment.ref,
-                    "to_ref": ref,
-                },
-            }
 
             def commit_to_oneline(commit: Commit):
                 committer = commit.commit.committer
@@ -444,7 +462,14 @@ class MainView(MultiView[ViewMode]):
 
             git_log_lines += list(map(commit_to_oneline, commits))[::-1]
 
-        return "\n".join(git_log_lines)
+            return (
+                "\n".join(git_log_lines),
+                DeploymentPayload(
+                    type=DeploymentType.ROLLBACK.value if rollback else DeploymentType.FORWARD.value,
+                    from_ref=recent_deployment.ref,
+                    to_ref=ref,
+                ),
+            )
 
     async def show_promote_confirmation(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         deployment: Optional[Deployment] = self._deployments_view.deployments_table.selected_data
@@ -456,7 +481,7 @@ class MainView(MultiView[ViewMode]):
             return True
 
         await self.show(ViewMode.PROMOTE)
-        git_log = await self._get_git_log_diff(next_env, deployment.ref)
+        git_log, self._deployment_payload = await self._get_git_log_diff(next_env, deployment.ref)
 
         self._promote_view.choice_index = 1  # default to "No"
         self._promote_view.message = f"""Promote from {deployment.environment} to {next_env}?
@@ -481,7 +506,7 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
             return True
 
         await self.show(ViewMode.DEPLOY)
-        git_log = await self._get_git_log_diff(ORDERED_ENVIRONMENTS[0], commit.sha)
+        git_log, self._deployment_payload = await self._get_git_log_diff(ORDERED_ENVIRONMENTS[0], commit.sha)
 
         self._deploy_view.choice_index = 1  # default to "No"
         self._deploy_view.message = f"""Deploy {short_sha(commit.sha)} to {ORDERED_ENVIRONMENTS[0]}?

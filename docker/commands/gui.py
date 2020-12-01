@@ -151,6 +151,7 @@ class DeploymentsView(Widget):
         )
 
         # neither "\t" nor ord("\t") work because - thanks to blessed - they're overwritten :/
+        # noinspection PyUnresolvedReferences
         self.on[blessed.keyboard.KEY_TAB] += self.focus_next_slot
         self.on[curses.KEY_BTAB] += self.focus_prev_slot
 
@@ -246,7 +247,7 @@ class MainView(MultiView[ViewMode]):
     async def init(self):
         self._fill_environments()
         if self._gh.repo_path:
-            await self._reload_data()
+            await self._reload_deployment_data()
             self.update_environments_table()
             await self.show(ViewMode.DEPLOYMENTS)
         else:
@@ -265,7 +266,7 @@ class MainView(MultiView[ViewMode]):
         else:
             self._watch_timer.stop()
 
-    async def _reload_data(self):
+    async def _reload_deployment_data(self):
         popover(self, "Loading")
 
         self._cached_statuses = dict()
@@ -280,7 +281,7 @@ class MainView(MultiView[ViewMode]):
         self, table: Table, key: blessed.keyboard.Keystroke,
     ):
         await self.show(ViewMode.DEPLOYMENTS)
-        await self._reload_data()
+        await self._reload_deployment_data()
 
     async def show_deployments(
         self, table: Table, key: blessed.keyboard.Keystroke,
@@ -292,7 +293,7 @@ class MainView(MultiView[ViewMode]):
         await self.show(ViewMode.DEPLOYMENTS)
         self._gh.repo_path = self._repo_list.current_repo
         await self._env_list.set_selected_index(0)
-        await self._reload_data()
+        await self._reload_deployment_data()
         self.update_environments_table()
         await self._deployments_view.deployments_table.set_selected_index(0)
         return True
@@ -308,7 +309,7 @@ class MainView(MultiView[ViewMode]):
         return True
 
     async def reload_deployments(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
-        await self._reload_data()
+        await self._reload_deployment_data()
         return True
 
     async def deployment_selection_changed(self, table: Table):
@@ -403,7 +404,7 @@ class MainView(MultiView[ViewMode]):
     async def do_deploy(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         _, value = self._deploy_view.choice
         if not value:
-            await self.show_commits(None, None)
+            await self._switch_to_commits_view()
             return True
 
         commit: Commit = self._commits.selected_data
@@ -562,10 +563,13 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
         widget.data = await self._gh.get_commits()
         return True
 
-    async def show_commits(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
+    async def _switch_to_commits_view(self):
         popover(self, "Loading commits")
         self._commits.data = await self._gh.get_commits()
         await self.show(ViewMode.COMMITS)
+
+    async def show_commits(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
+        await self._switch_to_commits_view()
         return True
 
 

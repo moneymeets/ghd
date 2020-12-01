@@ -1,10 +1,12 @@
 import textwrap
 
+import blessed.keyboard
+
 from .util import draw_border_double
 from .widget import Widget
 
 
-def popover(widget: Widget, text: str, wait_for_input: bool = False):
+def _draw_popover(widget: Widget, text: str):
     widget.clear_viewport()
     draw_border_double(widget)
 
@@ -17,6 +19,12 @@ def popover(widget: Widget, text: str, wait_for_input: bool = False):
 
     widget.flush()
 
-    if wait_for_input:
-        with widget.term.raw():
-            widget.term.inkey()
+
+def popover(widget: Widget, text: str):
+    _draw_popover(widget, text)
+
+
+def popover_confirm(widget: Widget, text: str) -> blessed.keyboard.Keystroke:
+    _draw_popover(widget, text)
+    with widget.term.raw():
+        return widget.term.inkey()

@@ -18,7 +18,7 @@ from output import color_success, color_error
 from saint import ExitApp
 from saint.messagebox import MessageBox
 from saint.multiview import MultiView
-from saint.popover import popover
+from saint.popover import popover, popover_confirm
 from saint.statusbar import StatusBar
 from saint.table import Column, Table, TableT
 from saint.timer import Timer
@@ -341,10 +341,37 @@ class MainView(MultiView[ViewMode]):
         self._repo_list.data = await self._gh.repositories
         return True
 
+    async def _try_or_force_deploy(self, callback):
+        try:
+            await callback(None)
+        except GithubError as ex:
+            key = popover_confirm(
+                self,
+                color_error(
+                    f"Failed to create deployment\n\n"
+                    f"{ex.message}"
+                    f"\n\n(press shift+Y to force deployment, any other key to abort)",
+                ),
+            )
+            if key == "Y":
+                try:
+                    await callback([])
+                except GithubError as ex:
+                    popover_confirm(
+                        self,
+                        color_error(
+                            f"Failed to force-create deployment\n\n{ex.message}\n\n(press any key to continue)",
+                        ),
+                    )
+                else:
+                    popover_confirm(
+                        self, color_success("Deployment forcefully created\n\n(press any key to continue)"),
+                    )
+
     async def do_promote(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         _, value = self._promote_view.choice
         if not value:
-            await self.show_deployments(None, None)
+            await self.show(ViewMode.DEPLOYMENTS)
             return True
 
         deployment: Deployment = self._deployments_view.deployments_table.selected_data
@@ -355,19 +382,22 @@ class MainView(MultiView[ViewMode]):
         # no need to check if we're already deployed in the previous environment (which is deployment.environment),
         # as we are already promoting from that deployment
 
-        await self._gh.create_deployment(
-            ref=deployment.ref,
-            environment=next_env,
-            transient=False,
-            production=next_env in PRODUCTION_ENVIRONMENTS,
-            task=deployment.task,
-            description=deployment.description,
-            required_contexts=None,
-            payload={"ghd": self._deployment_payload.to_dict()},
-        )
-        self._deployment_payload = None
-        await self.show_deployments(None, None)
-        await self._reload_data()
+        async def deploy(contexts):
+            await self._gh.create_deployment(
+                ref=deployment.ref,
+                environment=next_env,
+                transient=False,
+                production=next_env in PRODUCTION_ENVIRONMENTS,
+                task=deployment.task,
+                description=deployment.description,
+                required_contexts=contexts,
+                payload={"ghd": self._deployment_payload.to_dict()},
+            )
+            self._deployment_payload = None
+
+        await self._try_or_force_deploy(deploy)
+        await self.show(ViewMode.DEPLOYMENTS)
+        await self._reload_deployment_data()
         return True
 
     async def do_deploy(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
@@ -378,7 +408,7 @@ class MainView(MultiView[ViewMode]):
 
         commit: Commit = self._commits.selected_data
 
-        try:
+        async def deploy(contexts):
             await self._gh.deploy(
                 environment=ORDERED_ENVIRONMENTS[0],
                 ref=commit.sha,
@@ -386,18 +416,14 @@ class MainView(MultiView[ViewMode]):
                 production=ORDERED_ENVIRONMENTS[0] in PRODUCTION_ENVIRONMENTS,
                 task="deploy",
                 description=commit.commit.message.splitlines()[0],
-                required_contexts=None,
+                required_contexts=contexts,
                 payload={"ghd": self._deployment_payload.to_dict()},
             )
-        except GithubError as ex:
-            popover(
-                self, color_error(f"Failed to create deployment\n\n{ex.message}\n\n(press any key to continue)"), True,
-            )
+            self._deployment_payload = None
 
-        self._deployment_payload = None
-
-        await self.show_deployments(None, None)
-        await self._reload_data()
+        await self._try_or_force_deploy(deploy)
+        await self.show(ViewMode.DEPLOYMENTS)
+        await self._reload_deployment_data()
         return True
 
     async def _get_git_log_diff(self, env: str, ref: str) -> Tuple[str, DeploymentPayload]:

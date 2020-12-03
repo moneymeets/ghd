@@ -16,3 +16,4 @@ class ScreenBuffer:
 
     def output(self):
         self._term.stream.write(self.buffer.getvalue())
+        self._term.stream.flush()

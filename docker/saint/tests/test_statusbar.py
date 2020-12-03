@@ -18,7 +18,7 @@ class StatusbarTest(unittest.TestCase):
             statusbar.on_resize(term.width, term.height)
             statusbar.text = "foobar"
             statusbar.on_paint()
-            statusbar.flush()
+            statusbar.screen.output()
 
             real_data = term.screen_data
 
@@ -37,7 +37,7 @@ class StatusbarTest(unittest.TestCase):
             statusbar.on_resize(term.width, term.height)
             statusbar.text = "foobar"
             statusbar.on_paint()
-            statusbar.flush()
+            statusbar.screen.output()
 
             real_data = term.screen_data
 

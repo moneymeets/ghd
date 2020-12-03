@@ -13,7 +13,7 @@ class TestPlaceholderWidget(TestCase):
             widget.on_resize(10, 5)
             widget.origin_x, widget.origin_y = (0, 0)
             widget.on_paint()
-            widget.flush()
+            widget.screen.output()
 
             ref_data = term.screen_data
 
@@ -30,7 +30,7 @@ class TestPlaceholderWidget(TestCase):
             widget.on_resize(10, 2)
             widget.origin_x, widget.origin_y = (0, 2)
             widget.on_paint()
-            widget.flush()
+            widget.screen.output()
 
             ref_data = term.screen_data
 

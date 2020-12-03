@@ -1,10 +1,14 @@
 import blessed
 import colorama
 
+from saint.screenbuffer import ScreenBuffer
+
 
 class Style:
-    def __init__(self, term: blessed.Terminal):
+    def __init__(self, term: blessed.Terminal, screen: ScreenBuffer):
         self._term = term
+        self._screen = screen
+
         bg = colorama.Back.BLACK
         fg = colorama.Fore.WHITE
         reset = colorama.Style.RESET_ALL
@@ -17,7 +21,7 @@ class Style:
         self.status_bar = reset + colorama.Fore.BLACK + colorama.Back.CYAN
 
     def use_default(self):
-        print(self.default, end="", flush=True)
+        self._screen.print(self.default)
 
     def clear_screen(self):
-        print(self._term.home + self.default + self._term.clear, end="", flush=True)
+        self._screen.print(self._term.home, self.default, self._term.clear)

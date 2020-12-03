@@ -17,7 +17,7 @@ def _draw_popover(widget: Widget, text: str):
         offset_x = (widget.width - len(line)) // 2
         widget.out(offset_x, offset_y + y, widget.style.default, line)
 
-    widget.flush()
+    widget.screen.output()
 
 
 def popover(widget: Widget, text: str):

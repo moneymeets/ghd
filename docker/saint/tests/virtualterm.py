@@ -6,6 +6,7 @@ import pyte
 from blessed.terminal import WINSZ
 from pyte.screens import Char
 
+from saint.screenbuffer import ScreenBuffer
 from saint.style import Style
 from saint.tests.pytestreamwrapper import PyteStreamWrapper
 
@@ -22,13 +23,14 @@ class VirtualTerm:
         self.stream = pyte.streams.Stream(self.screen)
         with patch("os.isatty", return_value=True):
             self.term = blessed.Terminal(stream=PyteStreamWrapper(self.stream), kind="xterm-256color")
+        self._screen_buffer = ScreenBuffer(self.term)
 
         patch.object(
             self.term,
             "_height_and_width",
             return_value=WINSZ(ws_row=height, ws_col=width, ws_ypixel=16 * height, ws_xpixel=8 * width),
         ).__enter__()
-        self.style = Style(self.term)
+        self.style = Style(self.term, self._screen_buffer)
         self._fullscreen_ctx = None
 
     @property

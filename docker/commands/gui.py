@@ -2,6 +2,7 @@ import asyncio
 import concurrent.futures
 import curses
 import enum
+import signal
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -334,7 +335,6 @@ class MainView(MultiView[ViewMode]):
         self._deployments_view.statuses_table.data = data
         if force:
             self._deployments_view.statuses_table.on_paint()
-            self._deployments_view.statuses_table.flush()
 
     async def show_repo_selection(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         await self.show(ViewMode.REPOS)
@@ -579,13 +579,35 @@ class MainWindow(StatusBar):
         self._main_view = MainView(self, gh)
         self._main_view.on_status_changed += self._change_text
         self.on_resize(term.width, term.height)
-        self.auto_resize()
+        self._resized = False
+
+        def sigwinch_handler():
+            self._resized = True
+
+            async def async_handler():
+                self.on_paint()
+
+            asyncio.get_event_loop().create_task(async_handler())
+
+        asyncio.get_event_loop().add_signal_handler(signal.SIGWINCH, sigwinch_handler)
 
     async def _change_text(self, text: str):
         self.text = text
 
     async def init(self):
         await self._main_view.init()
+
+    def on_paint(self):
+        while self._resized:
+            self._resized = False
+            self.on_resize(self.term.width, self.term.height)
+            self.screen.clear()
+            super().on_paint()
+        else:
+            self.screen.clear()
+            super().on_paint()
+
+        self.screen.output()
 
 
 async def gui_main(gh: GitHub):
@@ -602,7 +624,6 @@ async def gui_main(gh: GitHub):
 
             while True:
                 main.on_paint()
-                main.flush()
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     key = await asyncio.get_event_loop().run_in_executor(pool, get_key)
                 await main.on_input(key)

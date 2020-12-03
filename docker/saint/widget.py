@@ -1,5 +1,3 @@
-import asyncio
-import signal
 from itertools import accumulate
 from typing import Final, List, Optional, TypeVar, Union
 
@@ -7,6 +5,7 @@ import blessed
 import blessed.keyboard
 import blessed.sequences
 
+from .screenbuffer import ScreenBuffer
 from .signal import AsyncSignal as SaintSignal, AsyncSignals
 from .style import Style
 
@@ -54,7 +53,8 @@ class Widget:
         parent_is_widget = isinstance(parent_or_term, Widget)
         self.parent: Final[Optional[Widget]] = parent_or_term if parent_is_widget else None
         self.term: Final[blessed.Terminal] = self.parent.term if parent_is_widget else parent_or_term
-        self._style: Final[Style] = Style(self.term)
+        self.screen: Final[ScreenBuffer] = self.parent.screen if parent_is_widget else ScreenBuffer(self.term)
+        self._style: Final[Style] = self.parent._style if parent_is_widget else Style(self.term, self.screen)
         self.layout_dir_vertical = layout_dir_vertical
         self.origin_x: int = 0
         self.origin_y: int = 0
@@ -74,9 +74,6 @@ class Widget:
         filler = self.style.default + " " * self.width
         for i in range(self.height):
             self.out(0, i, filler)
-
-    def flush(self):
-        self.term.stream.flush()
 
     @property
     def width(self) -> int:
@@ -99,14 +96,7 @@ class Widget:
             return
 
         output = blessed.sequences.Sequence("".join(map(str, args)), self.term)
-        self.term.stream.write(self.term.move_xy(x + self.origin_x, y + self.origin_y) + output)
-
-    def auto_resize(self):
-        def handler():
-            self.on_resize(self.term.width, self.term.height)
-            self.on_paint()
-
-        asyncio.get_event_loop().add_signal_handler(signal.SIGWINCH, handler)
+        self.screen.print(self.term.move_xy(x + self.origin_x, y + self.origin_y), output)
 
     def _set_focus_index(self, index: int):
         if not self.widgets:

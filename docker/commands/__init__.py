@@ -6,7 +6,7 @@ import click
 import progressbar
 import tabulate
 
-from github import DeploymentState, GitHub
+from github import GitHub
 from github.util import (
     get_commit_subject,
     get_commit_tags,
@@ -15,6 +15,7 @@ from github.util import (
     get_git_log,
     short_sha,
     color_state,
+    DeploymentState,
 )
 from output import print_info, color_unknown, print_success
 from util import (

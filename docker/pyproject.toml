@@ -5,7 +5,7 @@ description = "GitHub Deployments API CLI"
 authors = ["moneymeets GmbH <service@moneymeets.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.9.1"
 colorama = "^0.4.3"
 tabulate = "^0.8.6"
 progressbar2 = "^3.47.0"

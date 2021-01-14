@@ -4,7 +4,7 @@ import curses
 import enum
 import signal
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 import blessed
 import blessed.keyboard
@@ -427,7 +427,7 @@ class MainView(MultiView[ViewMode]):
         await self._reload_deployment_data()
         return True
 
-    async def _get_git_log_diff(self, env: str, ref: str) -> Tuple[str, DeploymentPayload]:
+    async def _get_git_log_diff(self, env: str, ref: str) -> tuple[str, DeploymentPayload]:
         recent_deployment = await self._gh.get_recent_deployment(env)
 
         if not recent_deployment:

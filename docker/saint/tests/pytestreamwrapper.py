@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import AnyStr, IO, Iterable, Iterator, List, Optional, Type
+from typing import AnyStr, IO, Iterable, Iterator, Optional, Type
 
 import pyte
 
@@ -35,7 +35,7 @@ class PyteStreamWrapper(IO):
     def readline(self, limit: int = ...) -> AnyStr:
         raise NotImplementedError
 
-    def readlines(self, hint: int = ...) -> List[AnyStr]:
+    def readlines(self, hint: int = ...) -> list[AnyStr]:
         raise NotImplementedError
 
     def seek(self, offset: int, whence: int = ...) -> int:

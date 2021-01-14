@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import click
 
@@ -40,7 +40,7 @@ def bool_to_str(b):
         return color_error("no")
 
 
-def parse_require_context(require_context: List[str]) -> Tuple[Optional[List[str]], str]:
+def parse_require_context(require_context: list[str]) -> tuple[Optional[list[str]], str]:
     if "-" in require_context:
         if len(require_context) != 1:
             raise RuntimeError("When not requiring any context by using '-', no other contexts must be required")

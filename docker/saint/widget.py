@@ -1,5 +1,5 @@
 from itertools import accumulate
-from typing import Final, List, Optional, TypeVar, Union
+from typing import Final, Optional, TypeVar, Union
 
 import blessed
 import blessed.keyboard
@@ -61,7 +61,7 @@ class Widget:
         self.size_x: int = 1
         self.size_y: int = 1
         self.flex: int = 1
-        self.widgets: List[Widget] = []
+        self.widgets: list[Widget] = []
         self.focus_index: int = 0
         self.on: Final[AsyncSignals[[Widget_co, blessed.keyboard.Keystroke], None]] = AsyncSignals()
 

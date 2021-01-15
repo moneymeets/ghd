@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 import click
 import progressbar
@@ -191,7 +191,7 @@ async def cmd_deploy(
     transient: bool,
     production: bool,
     description: str,
-    require_context: List[str],
+    require_context: list[str],
     check_constraints: bool,
 ):
     require_context, require_context_str = parse_require_context(require_context)

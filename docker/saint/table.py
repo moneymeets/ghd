@@ -2,12 +2,10 @@ import curses
 from typing import (
     Any,
     Callable,
-    Dict,
     Generic,
     Iterable,
     Optional,
     Sequence,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -30,8 +28,8 @@ class Column:
     @staticmethod
     def getter(
         *names: str, styler: Optional[Callable[[Any, int], str]] = None,
-    ) -> Callable[[Dict[str, Any], int], str]:
-        def f(row: Dict[str, Any], max_length: int):
+    ) -> Callable[[dict[str, Any], int], str]:
+        def f(row: dict[str, Any], max_length: int):
             cursor = row
             for name in names:
                 cursor = cursor[name]
@@ -143,7 +141,7 @@ class Table(Widget, Generic[TableT]):
             self._view_offset = self._selected_index - self.height
 
     @property
-    def _column_dimensions(self) -> Iterable[Tuple[int, int]]:
+    def _column_dimensions(self) -> Iterable[tuple[int, int]]:
         x = self.column_padding
         for width in self._widths[self._left_column :]:
             padded_width = self.column_padding + width

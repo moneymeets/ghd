@@ -1,4 +1,4 @@
-from typing import Dict, Generic, Optional, TypeVar, Union
+from typing import Generic, Optional, TypeVar, Union
 
 import blessed
 
@@ -13,7 +13,7 @@ class MultiView(Widget, Generic[MultiViewKey]):
     def __init__(self, parent_or_term: Union[Optional[Widget], blessed.Terminal]):
         super().__init__(parent_or_term, False)
         self.current_view: Optional[MultiViewKey] = None
-        self.views: Dict[MultiViewKey, Widget] = dict()
+        self.views: dict[MultiViewKey, Widget] = dict()
 
     def add(self, key: MultiViewKey, widget: Widget):
         self.views[key] = widget

@@ -1,5 +1,5 @@
 import curses
-from typing import Optional, Union, Sequence, Tuple, Any
+from typing import Optional, Union, Sequence, Any
 
 import blessed
 import blessed.keyboard
@@ -16,7 +16,7 @@ class MessageBox(Widget):
         self,
         parent_or_term: Union[Optional[Widget], blessed.Terminal],
         message: str,
-        choices: Sequence[Tuple[str, Any]],
+        choices: Sequence[tuple[str, Any]],
     ):
         super().__init__(parent_or_term, False)
         self.message = message

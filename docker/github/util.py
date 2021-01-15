@@ -3,7 +3,7 @@ import json
 import os
 import re
 import subprocess
-from typing import List, Optional
+from typing import Optional
 
 import colorama
 
@@ -78,14 +78,14 @@ def get_commit_subject(ref: str) -> Optional[str]:
     return output if exit_code == 0 else None
 
 
-def get_git_log(base_ref: str, head_ref: str) -> Optional[List[str]]:
+def get_git_log(base_ref: str, head_ref: str) -> Optional[list[str]]:
     exit_code, output = subprocess.getstatusoutput(
         f"git log '--pretty=format:[%h  %cs  %cn]  %s' '{base_ref}..{head_ref}'",
     )
     return output.splitlines() if exit_code == 0 else None
 
 
-def get_commit_tags(ref: str) -> List[str]:
+def get_commit_tags(ref: str) -> list[str]:
     exit_code, output = subprocess.getstatusoutput(f"git describe --tags {ref}")
     return output.splitlines() if exit_code == 0 else []
 

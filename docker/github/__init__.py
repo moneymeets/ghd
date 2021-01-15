@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence
 from urllib.parse import urlencode
 
 import aiohttp
@@ -97,7 +97,7 @@ class GitHub:
         async with self.session_flash.post(self._api_url(path), json=json_data) as response:
             return await response.json()
 
-    async def get_deployments(self, environment: Optional[str]) -> List[Deployment]:
+    async def get_deployments(self, environment: Optional[str]) -> list[Deployment]:
         try:
             path = f"/repos/{self.repo_path}/deployments"
             if environment:
@@ -129,7 +129,7 @@ class GitHub:
     async def is_deployed_in_environment(self, ref: str, environment: str) -> bool:
         return any(ref == deployment.ref for deployment in await self.get_deployments(environment))
 
-    async def get_deployment_statuses(self, deployment_id: int) -> List[DeploymentStatus]:
+    async def get_deployment_statuses(self, deployment_id: int) -> list[DeploymentStatus]:
         return sorted(
             DeploymentStatus.schema().load(
                 await self.get_ant_man(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"), many=True,
@@ -138,12 +138,12 @@ class GitHub:
             reverse=True,
         )
 
-    async def get_commits(self) -> List[Commit]:
+    async def get_commits(self) -> list[Commit]:
         commits = await self.get(f"/repos/{self.repo_path}/commits")
         GithubError.raise_from_message(commits)
         return Commit.schema().load(commits, many=True)
 
-    async def get_commits_until(self, sha: str, until: str) -> Tuple[List[Commit], bool]:
+    async def get_commits_until(self, sha: str, until: str) -> tuple[list[Commit], bool]:
         sha_arg = urlencode({"sha": sha})
         commits = await self.get(f"/repos/{self.repo_path}/commits?{sha_arg}")
         GithubError.raise_from_message(commits)
@@ -164,7 +164,7 @@ class GitHub:
         production: bool,
         task: str,
         description: str,
-        required_contexts: Optional[List[str]],
+        required_contexts: Optional[list[str]],
         payload: Optional[Any] = None,
     ):
         return await self.post(
@@ -200,7 +200,7 @@ class GitHub:
         production: bool,
         task: str,
         description: str,
-        required_contexts: Optional[List[str]],
+        required_contexts: Optional[list[str]],
         payload: Optional[Any] = None,
     ) -> int:
         deployment_creation_result = await self.create_deployment(
@@ -221,7 +221,7 @@ class GitHub:
         return deployment_creation_result["id"]
 
     @property
-    async def repositories(self) -> List[Repository]:
+    async def repositories(self) -> list[Repository]:
         result = []
         url = self._api_url("/user/repos")
         while True:

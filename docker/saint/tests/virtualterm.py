@@ -1,4 +1,4 @@
-from typing import DefaultDict, Iterable, List
+from typing import DefaultDict, Iterable
 from unittest.mock import patch
 
 import blessed
@@ -38,14 +38,14 @@ class VirtualTerm:
         return self.screen.buffer
 
     @property
-    def screen_lines(self) -> List[DefaultDict[int, Char]]:
+    def screen_lines(self) -> list[DefaultDict[int, Char]]:
         return list(map(lambda y: self.screen.buffer[y], range(self.height)))
 
     def columns_of_line(self, line: DefaultDict[int, Char]) -> Iterable[Char]:
         return map(lambda x: line[x], range(self.width))
 
     @property
-    def screen_data(self) -> List[List[Char]]:
+    def screen_data(self) -> list[list[Char]]:
         return [list(self.columns_of_line(line)) for line in self.screen_lines]
 
     def feed(self, *args):

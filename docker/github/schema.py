@@ -54,11 +54,20 @@ class CommitDetails:
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
+class CommitParent:
+    sha: str
+    url: str
+    html_url: str
+
+
+@dataclass_json(undefined=Undefined.EXCLUDE)
+@dataclass
 class Commit:
     sha: str
     commit: CommitDetails
     committer: Actor
     author: Actor
+    parents: list[CommitParent]
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)

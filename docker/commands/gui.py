@@ -11,6 +11,7 @@ import blessed.keyboard
 import blessed.sequences
 import colorama
 from dataclasses_json import dataclass_json
+import tabulate
 
 from github import GitHub, GithubError
 from github.schema import Commit, Deployment, DeploymentStatus, Repository
@@ -489,15 +490,27 @@ class MainView(MultiView[ViewMode]):
                 else []
             )
 
-            def commit_to_oneline(commit: Commit):
-                committer = commit.commit.committer
-                author = commit.author.login
-                committed = localize_date(committer.date)
-                message, *_ = commit.commit.message.splitlines()
-                sha = short_sha(commit.sha)
-                return f"[{sha}  {committed}  {author}]  {message}"
+            def colorize_message(message: str, is_merge_commit: bool):
+                return (
+                    message
+                    if not is_merge_commit
+                    else f"{colorama.Fore.GREEN}{colorama.Style.BRIGHT}{message}{self.style.default}"
+                )
 
-            git_log_lines += list(map(commit_to_oneline, commits))[::-1]
+            table_data = {
+                "sha": [],
+                "committed": [],
+                "author": [],
+                "message": [],
+            }
+            for commit in commits[::-1]:
+                table_data["sha"].append(short_sha(commit.sha))
+                table_data["committed"].append(localize_date(commit.commit.committer.date))
+                table_data["author"].append(commit.author.login)
+                message, *_ = commit.commit.message.splitlines()
+                table_data["message"].append(colorize_message(message, len(commit.parents) > 1))
+
+            git_log_lines += tabulate.tabulate(table_data, headers="keys").splitlines()
 
             return (
                 "\n".join(git_log_lines),

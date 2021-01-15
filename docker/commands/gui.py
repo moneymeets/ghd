@@ -368,6 +368,16 @@ class MainView(MultiView[ViewMode]):
                     popover_confirm(
                         self, color_success("Deployment forcefully created\n\n(press any key to continue)"),
                     )
+        except Exception as ex:
+            popover_confirm(
+                self,
+                color_error(
+                    f"An unhandled error occured."
+                    f" Please report this at https://github.com/moneymeets/ghd/issues.\n\n"
+                    f"{ex}\n\n"
+                    f"(press any key to continue)",
+                ),
+            )
 
     async def do_promote(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         _, value = self._promote_view.choice

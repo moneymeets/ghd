@@ -2,9 +2,8 @@ name: CI
 on: [push]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
-    container: moneymeets/moneymeets-ci:latest
 
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -12,10 +11,17 @@ jobs:
       DOCKER_REGISTRY: moneymeets/ghd
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9.1
+
+      - name: Setup Poetry
+        uses: moneymeets/action-setup-poetry@master
 
       - name: Cache Poetry virtualenv
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         id: poetry-cache
         with:
           path: ~/.cache/pypoetry/virtualenvs

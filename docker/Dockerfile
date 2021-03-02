@@ -1,16 +1,18 @@
-FROM python:3.9-alpine
+FROM python:3.9-slim-buster
 
 WORKDIR /ghd
 COPY . .
 
 RUN set -ex \
-    && apk add --update --no-cache build-base libffi-dev openssl-dev \
+    && apt update \
+    && apt install -y libffi-dev \
     && pip install poetry \
     && poetry config virtualenvs.in-project true \
     && poetry install \
     && poetry run nosetests \
-    && apk del build-base libffi-dev openssl-dev \
+    && apt remove libffi-dev -y \
+    && apt clean autoclean autoremove -y \
+    && rm -rf /var/lib/apt/lists/* \
     && rm -r ~/.cache
-
 
 ENTRYPOINT ["/ghd/entrypoint.sh"]

@@ -583,7 +583,7 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
 
     async def reload_commits(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         popover(self, "Loading commits")
-        widget.data = await self._gh.get_commits()
+        _, widget.data = await asyncio.gather(self._reload_deployment_data(), self._gh.get_commits())
         return True
 
     async def _switch_to_commits_view(self):

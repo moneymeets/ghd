@@ -88,11 +88,11 @@ class Table(Widget, Generic[TableT]):
         return self._data
 
     @data.setter
-    def data(self, data: Sequence[TableT]):
-        self._data = data
+    def data(self, rows: Sequence[TableT]):
+        self._data = rows
         self._calc_widths()
-        if self.focus_index >= len(data):
-            self.focus_index = len(data) - 1
+        if self.focus_index >= len(rows):
+            self.focus_index = len(rows) - 1
 
     @property
     def selected_data(self) -> Optional[TableT]:

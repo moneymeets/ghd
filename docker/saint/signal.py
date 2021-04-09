@@ -56,12 +56,9 @@ class Signal(_SignalBase):
 
 
 class AsyncSignal(_SignalBase):
-    async def emit(self, *args, **kwargs):
+    async def emit(self, *args, **kwargs) -> list[bool]:
         fs = [handler(*args, **kwargs) for handler in self._unwrapped_handlers]
-        results = []
-        for f in asyncio.as_completed(fs):
-            results.append(await f)
-        return results
+        return [await f for f in asyncio.as_completed(fs)]
 
     async def __call__(self, *args, **kwargs):
         return await self.emit(*args, **kwargs)

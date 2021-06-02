@@ -15,9 +15,6 @@ class ConstraintError(Error):
 
 
 class GithubError(Error):
-    def __init__(self, message: str):
-        self.message = message
-
     @classmethod
     def raise_from_message(cls, payload: dict):
         if not isinstance(payload, dict):
@@ -121,13 +118,21 @@ class GitHub:
             return
 
         previous_environment = ordered_environments[index - 1]
-        if not await self.is_deployed_in_environment(ref, previous_environment):
+        if not await self.is_successfully_deployed_in_environment(ref, previous_environment):
             raise ConstraintError(
-                f"Deployment of {ref} to {environment} failed, because deployment to {previous_environment} is missing",
+                f"Deployment of {ref} to {environment} failed,"
+                f" because a successful deployment to {previous_environment} is missing",
             )
 
-    async def is_deployed_in_environment(self, ref: str, environment: str) -> bool:
-        return any(ref == deployment.ref for deployment in await self.get_deployments(environment))
+    async def is_successfully_deployed_in_environment(self, ref: str, environment: str) -> bool:
+        for deployment in await self.get_deployments(environment):
+            if (
+                ref == deployment.ref
+                and (statuses := await self.get_deployment_statuses(deployment.id))
+                and statuses[0].state == DeploymentState.success
+            ):
+                return True
+        return False
 
     async def get_deployment_statuses(self, deployment_id: int) -> list[DeploymentStatus]:
         return sorted(
@@ -156,32 +161,6 @@ class GitHub:
             result.append(commit)
         return result, commit_found
 
-    async def create_deployment(
-        self,
-        ref: str,
-        environment: str,
-        transient: bool,
-        production: bool,
-        task: str,
-        description: str,
-        required_contexts: Optional[list[str]],
-        payload: Optional[Any] = None,
-    ):
-        return await self.post(
-            f"/repos/{self.repo_path}/deployments",
-            {
-                "ref": ref,
-                "auto_merge": False,
-                "environment": environment,
-                "transient_environment": transient,
-                "production_environment": production,
-                "task": task,
-                "description": description,
-                "required_contexts": required_contexts,
-                "payload": json.dumps(payload) if payload else "",
-            },
-        )
-
     async def create_deployment_status(
         self, deployment_id: int, state: DeploymentState, environment: str, description: str,
     ):
@@ -203,15 +182,19 @@ class GitHub:
         required_contexts: Optional[list[str]],
         payload: Optional[Any] = None,
     ) -> int:
-        deployment_creation_result = await self.create_deployment(
-            ref=ref,
-            environment=environment,
-            transient=transient,
-            production=production,
-            task=task,
-            description=description,
-            required_contexts=required_contexts,
-            payload=payload,
+        deployment_creation_result = await self.post(
+            f"/repos/{self.repo_path}/deployments",
+            {
+                "ref": ref,
+                "auto_merge": False,
+                "environment": environment,
+                "transient_environment": transient,
+                "production_environment": production,
+                "task": task,
+                "description": description,
+                "required_contexts": required_contexts,
+                "payload": json.dumps(payload) if payload else "",
+            },
         )
         GithubError.raise_from_message(deployment_creation_result)
 

@@ -70,6 +70,9 @@ class PyteStreamWrapper(IO):
         raise NotImplementedError
 
     def __exit__(
-        self, t: Optional[Type[BaseException]], value: Optional[BaseException], traceback: Optional[TracebackType],
+        self,
+        t: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
     ) -> Optional[bool]:
         raise NotImplementedError

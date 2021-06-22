@@ -234,7 +234,13 @@ class MainView(MultiView[ViewMode]):
             ViewMode.COMMITS: bullet_join("[enter] select", "[q] abort", "[r]eload"),
             ViewMode.DEPLOY: select_abort,
             ViewMode.DEPLOYMENTS: bullet_join(
-                "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[w]atch", "[q]uit",
+                "[d]eploy",
+                "[p]romote",
+                "[e]nv filter",
+                "[r]eload",
+                "[s]witch repo",
+                "[w]atch",
+                "[q]uit",
             ),
             ViewMode.ENVIRONMENTS: select_abort,
             ViewMode.PROMOTE: select_abort,
@@ -254,7 +260,8 @@ class MainView(MultiView[ViewMode]):
             await self.show(ViewMode.DEPLOYMENTS)
         else:
             await self.show_repo_selection(
-                self._repo_list, blessed.keyboard.Keystroke(),
+                self._repo_list,
+                blessed.keyboard.Keystroke(),
             )
             await self.show(ViewMode.REPOS)
         await self.on_view_switched(self)
@@ -280,13 +287,17 @@ class MainView(MultiView[ViewMode]):
         await self._deployments_view.deployments_table.on_selection_changed(self._deployments_view.deployments_table)
 
     async def apply_environment_selection(
-        self, table: Table, key: blessed.keyboard.Keystroke,
+        self,
+        table: Table,
+        key: blessed.keyboard.Keystroke,
     ):
         await self.show(ViewMode.DEPLOYMENTS)
         await self._reload_deployment_data()
 
     async def show_deployments(
-        self, table: Table, key: blessed.keyboard.Keystroke,
+        self,
+        table: Table,
+        key: blessed.keyboard.Keystroke,
     ):
         await self.show(ViewMode.DEPLOYMENTS)
         return True
@@ -367,7 +378,8 @@ class MainView(MultiView[ViewMode]):
                     )
                 else:
                     popover_confirm(
-                        self, color_success("Deployment forcefully created\n\n(press any key to continue)"),
+                        self,
+                        color_success("Deployment forcefully created\n\n(press any key to continue)"),
                     )
         except Exception as ex:
             popover_confirm(

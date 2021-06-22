@@ -42,10 +42,18 @@ def main_group():
 @main_group.command(name="list", short_help="List deployments")
 @click_repo_option()
 @click.option(
-    "-v", "--verbose/--no-verbose", required=False, default=False, help="Print deployment states (slow)",
+    "-v",
+    "--verbose/--no-verbose",
+    required=False,
+    default=False,
+    help="Print deployment states (slow)",
 )
 @click.option(
-    "-l", "--limit", required=False, default=10, help="How many deployments to list",
+    "-l",
+    "--limit",
+    required=False,
+    default=10,
+    help="How many deployments to list",
 )
 @click.option(
     "-e",
@@ -228,7 +236,9 @@ async def cmd_deploy(
     async with GitHub(repo_path=repo) as gh:
         if check_constraints:
             await gh.verify_ref_is_deployed_in_previous_environment(
-                ref, environment, ORDERED_ENVIRONMENTS,
+                ref,
+                environment,
+                ORDERED_ENVIRONMENTS,
             )
 
         deployment_id = await gh.deploy(
@@ -257,18 +267,32 @@ async def cmd_deploy(
 )
 @click_deployment_id_option()
 @click.option(
-    "-s", "--state", type=click.Choice(choices=DeploymentState.__members__.keys()), required=True, help="State",
+    "-s",
+    "--state",
+    type=click.Choice(choices=DeploymentState.__members__.keys()),
+    required=True,
+    help="State",
 )
 @click.option(
-    "-D", "--description", default="Deployed via GHD", help="Deployment description",
+    "-D",
+    "--description",
+    default="Deployed via GHD",
+    help="Deployment description",
 )
 @coroutine
 async def cmd_set_state(
-    repo: str, environment: str, deployment_id: int, state: str, description: Optional[str],
+    repo: str,
+    environment: str,
+    deployment_id: int,
+    state: str,
+    description: Optional[str],
 ):
     async with GitHub(repo_path=repo) as gh:
         await gh.create_deployment_status(
-            deployment_id=deployment_id, state=DeploymentState[state], environment=environment, description=description,
+            deployment_id=deployment_id,
+            state=DeploymentState[state],
+            environment=environment,
+            description=description,
         )
 
 

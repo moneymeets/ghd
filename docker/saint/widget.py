@@ -48,7 +48,9 @@ class Widget:
     Signal: SaintSignal = SaintSignal
 
     def __init__(
-        self, parent_or_term: Union[Optional["Widget"], blessed.Terminal], layout_dir_vertical: bool,
+        self,
+        parent_or_term: Union[Optional["Widget"], blessed.Terminal],
+        layout_dir_vertical: bool,
     ):
         parent_is_widget = isinstance(parent_or_term, Widget)
         self.parent: Final[Optional[Widget]] = parent_or_term if parent_is_widget else None

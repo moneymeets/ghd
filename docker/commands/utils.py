@@ -38,7 +38,12 @@ def click_repo_option(required: bool = True):
 def click_deployment_id_option():
     deployment_id = get_current_deployment_id()
     return click.option(
-        "-d", "--deployment-id", type=int, required=deployment_id is None, default=deployment_id, help="Deployment ID",
+        "-d",
+        "--deployment-id",
+        type=int,
+        required=deployment_id is None,
+        default=deployment_id,
+        help="Deployment ID",
     )
 
 

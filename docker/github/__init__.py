@@ -1,3 +1,4 @@
+from asyncstdlib.builtins import any as aany
 import json
 import os
 from typing import Any, Optional, Sequence
@@ -101,7 +102,9 @@ class GitHub:
                 environment_param = urlencode({"environment": environment})
                 path += f"?{environment_param}"
             return sorted(
-                Deployment.schema().load(await self.get_ant_man(path), many=True), key=lambda e: e.id, reverse=True,
+                Deployment.schema().load(await self.get_ant_man(path), many=True),
+                key=lambda e: e.id,
+                reverse=True,
             )
         except TypeError:
             return []
@@ -111,7 +114,10 @@ class GitHub:
         return deployments[0] if deployments else None
 
     async def verify_ref_is_deployed_in_previous_environment(
-        self, ref: str, environment: str, ordered_environments: Sequence[str],
+        self,
+        ref: str,
+        environment: str,
+        ordered_environments: Sequence[str],
     ):
         index = ordered_environments.index(environment)
         if index == 0:
@@ -125,19 +131,20 @@ class GitHub:
             )
 
     async def is_successfully_deployed_in_environment(self, ref: str, environment: str) -> bool:
-        for deployment in await self.get_deployments(environment):
-            if (
-                ref == deployment.ref
-                and (statuses := await self.get_deployment_statuses(deployment.id))
+        return await aany(
+            (
+                (statuses := await self.get_deployment_statuses(deployment.id))
                 and statuses[0].state == DeploymentState.success
-            ):
-                return True
-        return False
+            )
+            for deployment in await self.get_deployments(environment)
+            if ref == deployment.ref
+        )
 
     async def get_deployment_statuses(self, deployment_id: int) -> list[DeploymentStatus]:
         return sorted(
             DeploymentStatus.schema().load(
-                await self.get_ant_man(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"), many=True,
+                await self.get_ant_man(f"/repos/{self.repo_path}/deployments/{deployment_id}/statuses"),
+                many=True,
             ),
             key=lambda e: e.id,
             reverse=True,
@@ -162,7 +169,11 @@ class GitHub:
         return result, commit_found
 
     async def create_deployment_status(
-        self, deployment_id: int, state: DeploymentState, environment: str, description: str,
+        self,
+        deployment_id: int,
+        state: DeploymentState,
+        environment: str,
+        description: str,
     ):
         post_fn = self.post_flash if state != DeploymentState.inactive else self.post
 

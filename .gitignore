@@ -1,7 +1,7 @@
-.idea/
+.idea/**
+!.idea/watcherTasks.xml
 *.pyc
 *.egg-info/
 __pycache__/
 dist/
 .coverage
-

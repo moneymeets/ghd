@@ -5,6 +5,10 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 15
 
+    defaults:
+      run:
+        working-directory: docker
+
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
@@ -32,17 +36,18 @@ jobs:
       - name: Install Dependencies
         if: steps.poetry-cache.outputs.cache-hit != 'true'
         run: |
-          cd docker && poetry install
+          poetry install
 
       - name: Lint and test
         run: |
-          cd docker && poetry run flake8 && poetry run nosetests
+          poetry run flake8
+          poetry run coverage run -m pytest
+          poetry run coverage report --fail-under 31
 
       - name: Build and publish image
         run: |
           # For branch names other than master (e.g. feature/test), append last branch name component (test) to the tag
           export TAG=${GITHUB_REF##*/}
-          cd docker
           docker build -t $DOCKER_REGISTRY:latest .
           [ "$TAG" != "latest" ] && docker tag $DOCKER_REGISTRY:latest $DOCKER_REGISTRY:$TAG
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD

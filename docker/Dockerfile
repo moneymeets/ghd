@@ -9,7 +9,7 @@ RUN set -ex \
     && pip install poetry \
     && poetry config virtualenvs.in-project true \
     && poetry install \
-    && poetry run nosetests \
+    && poetry run pytest \
     && apt remove libffi-dev -y \
     && apt clean autoclean autoremove -y \
     && rm -rf /var/lib/apt/lists/* \

@@ -21,7 +21,8 @@ class TestPlaceholderWidget(TestCase):
             term.feed(5 * Placeholder.get_line_filler(10))
 
             self.assertSequenceEqual(
-                ref_data, term.screen_data,
+                ref_data,
+                term.screen_data,
             )
 
     def test_draw_partial(self):
@@ -36,13 +37,20 @@ class TestPlaceholderWidget(TestCase):
 
         with VirtualTerm(10, 5) as term:
             term.feed(
-                colorama.Style.RESET_ALL, colorama.Fore.RESET, colorama.Back.RESET, 2 * " " * 10,
+                colorama.Style.RESET_ALL,
+                colorama.Fore.RESET,
+                colorama.Back.RESET,
+                2 * " " * 10,
             )
             term.feed(2 * Placeholder.get_line_filler(10))
             term.feed(
-                colorama.Style.RESET_ALL, colorama.Fore.RESET, colorama.Back.RESET, 1 * " " * 10,
+                colorama.Style.RESET_ALL,
+                colorama.Fore.RESET,
+                colorama.Back.RESET,
+                1 * " " * 10,
             )
 
             self.assertSequenceEqual(
-                ref_data, term.screen_data,
+                ref_data,
+                term.screen_data,
             )

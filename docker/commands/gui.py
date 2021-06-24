@@ -13,7 +13,7 @@ import colorama
 from dataclasses_json import dataclass_json
 import tabulate
 
-from github import GitHub, GithubError
+from github import GitHub, GithubError, ConstraintError
 from github.schema import Commit, Deployment, DeploymentStatus, Repository
 from github.util import get_state_color, short_sha, DeploymentState
 from output import color_success, color_error
@@ -234,7 +234,13 @@ class MainView(MultiView[ViewMode]):
             ViewMode.COMMITS: bullet_join("[enter] select", "[q] abort", "[r]eload"),
             ViewMode.DEPLOY: select_abort,
             ViewMode.DEPLOYMENTS: bullet_join(
-                "[d]eploy", "[p]romote", "[e]nv filter", "[r]eload", "[s]witch repo", "[w]atch", "[q]uit",
+                "[d]eploy",
+                "[p]romote",
+                "[e]nv filter",
+                "[r]eload",
+                "[s]witch repo",
+                "[w]atch",
+                "[q]uit",
             ),
             ViewMode.ENVIRONMENTS: select_abort,
             ViewMode.PROMOTE: select_abort,
@@ -254,7 +260,8 @@ class MainView(MultiView[ViewMode]):
             await self.show(ViewMode.DEPLOYMENTS)
         else:
             await self.show_repo_selection(
-                self._repo_list, blessed.keyboard.Keystroke(),
+                self._repo_list,
+                blessed.keyboard.Keystroke(),
             )
             await self.show(ViewMode.REPOS)
         await self.on_view_switched(self)
@@ -280,13 +287,17 @@ class MainView(MultiView[ViewMode]):
         await self._deployments_view.deployments_table.on_selection_changed(self._deployments_view.deployments_table)
 
     async def apply_environment_selection(
-        self, table: Table, key: blessed.keyboard.Keystroke,
+        self,
+        table: Table,
+        key: blessed.keyboard.Keystroke,
     ):
         await self.show(ViewMode.DEPLOYMENTS)
         await self._reload_deployment_data()
 
     async def show_deployments(
-        self, table: Table, key: blessed.keyboard.Keystroke,
+        self,
+        table: Table,
+        key: blessed.keyboard.Keystroke,
     ):
         await self.show(ViewMode.DEPLOYMENTS)
         return True
@@ -346,7 +357,7 @@ class MainView(MultiView[ViewMode]):
     async def _try_or_force_deploy(self, callback):
         try:
             await callback(None)
-        except GithubError as ex:
+        except (GithubError, ConstraintError) as ex:
             key = popover_confirm(
                 self,
                 color_error(
@@ -358,7 +369,7 @@ class MainView(MultiView[ViewMode]):
             if key == "Y":
                 try:
                     await callback([])
-                except GithubError as ex:
+                except (GithubError, ConstraintError) as ex:
                     popover_confirm(
                         self,
                         color_error(
@@ -367,7 +378,8 @@ class MainView(MultiView[ViewMode]):
                     )
                 else:
                     popover_confirm(
-                        self, color_success("Deployment forcefully created\n\n(press any key to continue)"),
+                        self,
+                        color_success("Deployment forcefully created\n\n(press any key to continue)"),
                     )
         except Exception as ex:
             popover_confirm(
@@ -395,7 +407,13 @@ class MainView(MultiView[ViewMode]):
         # as we are already promoting from that deployment
 
         async def deploy(contexts):
-            await self._gh.create_deployment(
+            if contexts is None or contexts != []:
+                await self._gh.verify_ref_is_deployed_in_previous_environment(
+                    ref=deployment.ref,
+                    environment=next_env,
+                    ordered_environments=ORDERED_ENVIRONMENTS,
+                )
+            await self._gh.deploy(
                 ref=deployment.ref,
                 environment=next_env,
                 transient=False,

@@ -18,5 +18,9 @@ class StatusBar(Widget):
         for widget in self.widgets:
             widget.on_paint()
         self.out(
-            0, self.height - 1, self.style.status_bar, self.text, self.term.clear_eol,
+            0,
+            self.height - 1,
+            self.style.status_bar,
+            self.text,
+            self.term.clear_eol,
         )

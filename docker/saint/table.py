@@ -27,7 +27,8 @@ class Column:
 
     @staticmethod
     def getter(
-        *names: str, styler: Optional[Callable[[Any, int], str]] = None,
+        *names: str,
+        styler: Optional[Callable[[Any, int], str]] = None,
     ) -> Callable[[dict[str, Any], int], str]:
         def f(row: dict[str, Any], max_length: int):
             cursor = row
@@ -48,7 +49,9 @@ class Table(Widget, Generic[TableT]):
     on_selection_changed: Widget.Signal
 
     def __init__(
-        self, parent_or_term: Union[Optional[Widget], blessed.Terminal], *columns: Column,
+        self,
+        parent_or_term: Union[Optional[Widget], blessed.Terminal],
+        *columns: Column,
     ):
         super().__init__(parent_or_term, True)
         self._columns = columns or self.columns
@@ -168,7 +171,11 @@ class Table(Widget, Generic[TableT]):
             cell = column.title[:width]
             cell_len = blessed.sequences.Sequence(cell, self.term).length()
             self.out(
-                x, 0, self.style.table_header, cell, " " * (width + self.column_padding - cell_len),
+                x,
+                0,
+                self.style.table_header,
+                cell,
+                " " * (width + self.column_padding - cell_len),
             )
 
         selected_style = self.style.table_row_selected_focus if self.has_focus else self._style.table_row_selected
@@ -182,7 +189,13 @@ class Table(Widget, Generic[TableT]):
                 cell = column.get(row, width)
                 cell_len = blessed.sequences.Sequence(cell, self.term).length()
                 self.out(
-                    x, y, color, cell, " " * (width - cell_len), color, " " * self.column_padding,
+                    x,
+                    y,
+                    color,
+                    cell,
+                    " " * (width - cell_len),
+                    color,
+                    " " * self.column_padding,
                 )
 
         if self._first_visible_row != 0:

@@ -9,6 +9,9 @@ from output import color_error, color_success, color_unknown, print_error
 class Error(Exception):
     exit_code = 1
 
+    def __init__(self, message: str):
+        self.message = message
+
 
 def handle_errors(func):
     @wraps(func)

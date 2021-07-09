@@ -1,4 +1,5 @@
-FROM python:3.9-slim-buster
+ARG PYTHON_VERSION
+FROM python:$PYTHON_VERSION-slim-buster
 
 WORKDIR /ghd
 COPY . .

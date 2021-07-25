@@ -10,12 +10,12 @@ import blessed
 import blessed.keyboard
 import blessed.sequences
 import colorama
+import github.Repository
 from dataclasses_json import dataclass_json
 import tabulate
 
-from github import GitHub, GithubError, ConstraintError
-from github.schema import Commit, Deployment, DeploymentStatus, Repository
-from github.util import get_state_color, short_sha, DeploymentState
+from githubwrapper import GitHub, GithubError, ConstraintError
+from githubwrapper.util import get_state_color, short_sha, DeploymentState
 from output import color_success, color_error
 from saint import ExitApp
 from saint.messagebox import MessageBox
@@ -27,6 +27,9 @@ from saint.timer import Timer
 from saint.util import exit_app, bullet_join
 from saint.widget import Widget
 from .utils import localize_date, ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, get_next_environment
+import github.Commit
+import github.Deployment
+import github.DeploymentStatus
 
 
 class ViewMode(enum.Enum):
@@ -63,8 +66,8 @@ def bool_to_str(b: Optional[bool], max_length: int):
         return colorama.Fore.RED + "no"[:max_length]
 
 
-def color_state(state: DeploymentState, max_length: int):
-    return get_state_color(state) + state.value[:max_length]
+def color_state(state: str, max_length: int):
+    return get_state_color(DeploymentState(state)) + state[:max_length]
 
 
 class SelectionTable(Table[TableT]):
@@ -89,7 +92,7 @@ class EnvironmentsList(SelectionTable):
         super().__init__(parent)
 
 
-class RepositoryList(SelectionTable[Repository]):
+class RepositoryList(SelectionTable[github.Repository.Repository]):
     columns = (
         Column("Private", lambda row, max_length: bool_to_str(row.private, max_length)),
         Column("Name", lambda row, max_length: row.full_name[:max_length]),
@@ -103,16 +106,16 @@ class RepositoryList(SelectionTable[Repository]):
         super().__init__(parent)
 
 
-class CommitSelection(SelectionTable[Commit]):
-    def _commit_column(self, row: Commit, max_length: int) -> str:
+class CommitSelection(SelectionTable[github.Commit.Commit]):
+    def _commit_column(self, row: github.Commit.Commit, max_length: int) -> str:
         text = short_sha(row.sha, max_length)
-        if envs := [deployment.environment for deployment in self._deployments.data if deployment.ref == row.sha]:
+        if envs := [deployment.environment for deployment in self._deployments.data if deployment.sha == row.sha]:
             # display in expected order of environments (i.e., re-orders "test, dev, live" to "dev, test, live")
             envs = [ordered for ordered in ORDERED_ENVIRONMENTS if ordered in envs]
             text = color_success(f"{text} ({', '.join(envs)})")
         return text
 
-    def __init__(self, parent: Widget, deployments: Table[Deployment]):
+    def __init__(self, parent: Widget, deployments: Table[github.Deployment.Deployment]):
         self._deployments = deployments
 
         super().__init__(
@@ -125,8 +128,8 @@ class CommitSelection(SelectionTable[Commit]):
 
 
 class DeploymentsView(Widget):
-    deployments_table: Table[Deployment]
-    statuses_table: Table[DeploymentStatus]
+    deployments_table: Table[github.Deployment.Deployment]
+    statuses_table: Table[github.DeploymentStatus.DeploymentStatus]
 
     def __init__(self, parent: Widget):
         super().__init__(parent, False)
@@ -138,7 +141,7 @@ class DeploymentsView(Widget):
             Column("Env", lambda row, max_length: row.environment[:max_length]),
             Column("Trans", lambda row, max_length: bool_to_str(row.transient_environment, max_length)),
             Column("Prod", lambda row, max_length: bool_to_str(row.production_environment, max_length)),
-            Column("Ref", lambda row, max_length: self._ref_styler(row.ref, max_length)),
+            Column("Ref", lambda row, max_length: self._ref_styler(row.sha, max_length)),
             Column("Task", lambda row, max_length: row.task[:max_length]),
             Column("Description", lambda row, max_length: row.description[:max_length]),
         )
@@ -158,15 +161,15 @@ class DeploymentsView(Widget):
         self.on[curses.KEY_BTAB] += self.focus_prev_slot
 
     @property
-    def _selected_ref(self) -> Optional[str]:
+    def _selected_sha(self) -> Optional[str]:
         data = self.deployments_table.selected_data
         if not data:
             return None
-        return data.ref
+        return data.sha
 
     def _ref_styler(self, ref: str, max_length: int):
         highlight = colorama.Back.YELLOW + colorama.Fore.BLACK
-        return (highlight if ref == self._selected_ref else "") + short_sha(ref, max_length)
+        return (highlight if ref == self._selected_sha else "") + short_sha(ref, max_length)
 
 
 class YesNoMessageBox(MessageBox):
@@ -280,7 +283,7 @@ class MainView(MultiView[ViewMode]):
 
         self._cached_statuses = dict()
         self._deployments_view.statuses_table.data = []
-        self._deployments_view.deployments_table.data = await self._gh.get_deployments(
+        self._deployments_view.deployments_table.data = self._gh.get_deployments(
             environment=self._env_list.current_filter,
         )
         self.on_paint()
@@ -343,7 +346,7 @@ class MainView(MultiView[ViewMode]):
             data = self._cached_statuses[cache_key]
         else:
             popover(self._deployments_view.statuses_table, "Loading")
-            data = self._cached_statuses[cache_key] = await self._gh.get_deployment_statuses(deployment_id)
+            data = self._cached_statuses[cache_key] = self._gh.get_deployment_statuses(deployment_id)
         self._deployments_view.statuses_table.data = data
         if force:
             self._deployments_view.statuses_table.on_paint()
@@ -351,7 +354,7 @@ class MainView(MultiView[ViewMode]):
     async def show_repo_selection(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
         await self.show(ViewMode.REPOS)
         popover(self, "Loading repository list")
-        self._repo_list.data = await self._gh.repositories
+        self._repo_list.data = self._gh.repositories
         return True
 
     async def _try_or_force_deploy(self, callback):
@@ -398,7 +401,7 @@ class MainView(MultiView[ViewMode]):
             await self.show(ViewMode.DEPLOYMENTS)
             return True
 
-        deployment: Deployment = self._deployments_view.deployments_table.selected_data
+        deployment: github.Deployment.Deployment = self._deployments_view.deployments_table.selected_data
         next_env = get_next_environment(deployment.environment)
         if not next_env:
             return True
@@ -409,12 +412,12 @@ class MainView(MultiView[ViewMode]):
         async def deploy(contexts):
             if contexts is None or contexts != []:
                 await self._gh.verify_ref_is_deployed_in_previous_environment(
-                    ref=deployment.ref,
+                    sha=deployment.sha,
                     environment=next_env,
                     ordered_environments=ORDERED_ENVIRONMENTS,
                 )
-            await self._gh.deploy(
-                ref=deployment.ref,
+            self._gh.deploy(
+                ref=deployment.sha,
                 environment=next_env,
                 transient=False,
                 production=next_env in PRODUCTION_ENVIRONMENTS,
@@ -436,10 +439,10 @@ class MainView(MultiView[ViewMode]):
             await self._switch_to_commits_view()
             return True
 
-        commit: Commit = self._commits.selected_data
+        commit: github.Commit.Commit = self._commits.selected_data
 
         async def deploy(contexts):
-            await self._gh.deploy(
+            self._gh.deploy(
                 environment=ORDERED_ENVIRONMENTS[0],
                 ref=commit.sha,
                 transient=False,
@@ -457,7 +460,7 @@ class MainView(MultiView[ViewMode]):
         return True
 
     async def _get_git_log_diff(self, env: str, ref: str) -> tuple[str, DeploymentPayload]:
-        recent_deployment = await self._gh.get_recent_deployment(env)
+        recent_deployment = self._gh.get_recent_deployment(env)
 
         if not recent_deployment:
             return (
@@ -465,7 +468,7 @@ class MainView(MultiView[ViewMode]):
                 DeploymentPayload(type=DeploymentType.INITIAL.value, from_ref="", to_ref=ref),
             )
 
-        if recent_deployment.ref == ref:
+        if recent_deployment.sha == ref:
             return (
                 colorama.Fore.CYAN + "No changes. This is a re-deployment." + colorama.Fore.RESET,
                 DeploymentPayload(type=DeploymentType.REDEPLOY.value, from_ref=ref, to_ref=ref),
@@ -473,11 +476,11 @@ class MainView(MultiView[ViewMode]):
 
         try:
             rollback = False
-            commits, deployment_ref_found = await self._gh.get_commits_until(ref, recent_deployment.ref)
+            commits, deployment_ref_found = self._gh.get_commits_until(ref, recent_deployment.sha)
             if not deployment_ref_found:
                 # assume a possible rollback
                 rollback = True
-                commits, deployment_ref_found = await self._gh.get_commits_until(recent_deployment.ref, ref)
+                commits, deployment_ref_found = self._gh.get_commits_until(recent_deployment.sha, ref)
         except KeyError:
             return (
                 colorama.Fore.RED + "The commit was not found in the repository." + colorama.Fore.RESET,
@@ -494,7 +497,7 @@ class MainView(MultiView[ViewMode]):
             ]
             return (
                 "\n".join(git_log_lines),
-                DeploymentPayload(type=DeploymentType.UNDEFINED.value, from_ref=recent_deployment.ref, to_ref=ref),
+                DeploymentPayload(type=DeploymentType.UNDEFINED.value, from_ref=recent_deployment.sha, to_ref=ref),
             )
         else:
             git_log_lines = (
@@ -534,13 +537,13 @@ class MainView(MultiView[ViewMode]):
                 "\n".join(git_log_lines),
                 DeploymentPayload(
                     type=DeploymentType.ROLLBACK.value if rollback else DeploymentType.FORWARD.value,
-                    from_ref=recent_deployment.ref,
+                    from_ref=recent_deployment.sha,
                     to_ref=ref,
                 ),
             )
 
     async def show_promote_confirmation(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
-        deployment: Optional[Deployment] = self._deployments_view.deployments_table.selected_data
+        deployment: Optional[github.Deployment.Deployment] = self._deployments_view.deployments_table.selected_data
         if deployment is None:
             return True
 
@@ -549,14 +552,14 @@ class MainView(MultiView[ViewMode]):
             return True
 
         await self.show(ViewMode.PROMOTE)
-        git_log, self._deployment_payload = await self._get_git_log_diff(next_env, deployment.ref)
+        git_log, self._deployment_payload = await self._get_git_log_diff(next_env, deployment.sha)
 
         self._promote_view.choice_index = 1  # default to "No"
         self._promote_view.message = f"""Promote from {deployment.environment} to {next_env}?
 
 Creator            {deployment.creator.login}
 Created            {localize_date(deployment.created_at)}
-Ref                {short_sha(deployment.ref)}
+Ref                {short_sha(deployment.sha)}
 Description        {deployment.description}
 Task               {deployment.task}
 Transient          {bool_to_str(False, 100)}{self.style.default}
@@ -569,7 +572,7 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
         return True
 
     async def show_deploy_confirmation(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:
-        commit: Optional[Commit] = self._commits.selected_data
+        commit: Optional[github.Commit.Commit] = self._commits.selected_data
         if commit is None:
             return True
 
@@ -606,7 +609,7 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
 
     async def _switch_to_commits_view(self):
         popover(self, "Loading commits")
-        self._commits.data = await self._gh.get_commits()
+        self._commits.data = self._gh.get_commits()
         await self.show(ViewMode.COMMITS)
 
     async def show_commits(self, widget: Widget, key: blessed.keyboard.Keystroke) -> bool:

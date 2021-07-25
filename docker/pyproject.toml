@@ -16,7 +16,7 @@ pyte = "*"
 babel = "*"
 pre-commit = "*"
 dataclasses-json = "*"
-asyncstdlib = "*"
+PyGithub = "^1.55"
 
 [tool.poetry.dev-dependencies]
 coverage = "*"

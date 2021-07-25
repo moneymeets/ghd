@@ -6,8 +6,8 @@ import click
 import progressbar
 import tabulate
 
-from github import GitHub
-from github.util import (
+from githubwrapper import GitHub
+from githubwrapper.util import (
     get_commit_subject,
     get_commit_tags,
     get_current_environment,
@@ -325,5 +325,4 @@ async def cmd_inspect(repo: str, deployment_id: int):
 @click_repo_option(required=False)
 @coroutine
 async def cmd_gui(repo: Optional[str]):
-    async with GitHub(repo_path=repo or "") as gh:
-        await gui_main(gh)
+    await gui_main(GitHub(repo_path=repo or ""))

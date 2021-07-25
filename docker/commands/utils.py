@@ -1,12 +1,12 @@
 import asyncio
-from datetime import datetime
+import datetime
 from functools import wraps
 from typing import Optional
 
 import click
 from babel.dates import format_datetime
 
-from github.util import (
+from githubwrapper.util import (
     get_current_deployment_id,
     get_repo_fallback,
     read_github_event_data,
@@ -47,8 +47,8 @@ def click_deployment_id_option():
     )
 
 
-def localize_date(date: str, max_length: int = 0):
-    result = format_datetime(datetime.strptime(f"{date}+0000", "%Y-%m-%dT%H:%M:%SZ%z").astimezone())
+def localize_date(date: datetime.datetime, max_length: int = 0):
+    result = format_datetime(date)
     return result[:max_length] if max_length else result
 
 

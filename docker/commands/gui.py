@@ -217,7 +217,7 @@ class MainView(MultiView[ViewMode]):
         self._deploy_view.on_select += self.do_deploy
         self.add(ViewMode.DEPLOY, self._deploy_view)
 
-        self._watch_timer = Timer(5, self.refresh_statuses)
+        self._watch_timer = Timer(5, self.refresh_deployment_statuses)
 
         self._cached_statuses = dict()
 
@@ -326,12 +326,13 @@ class MainView(MultiView[ViewMode]):
         return True
 
     async def deployment_selection_changed(self, table: Table):
-        await self._update_statuses(table, False)
+        await self._update_deployment_statuses(False)
 
-    async def refresh_statuses(self):
-        await self._update_statuses(None, True)
+    async def refresh_deployment_statuses(self):
+        await self._update_deployment_statuses(True)
+        self.screen.output()
 
-    async def _update_statuses(self, table, force: False):
+    async def _update_deployment_statuses(self, force: False):
         selected = self._deployments_view.deployments_table.selected_data
         if selected is None:
             self._deployments_view.statuses_table.data = []

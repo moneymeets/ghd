@@ -34,7 +34,9 @@ class SignalTest(unittest.IsolatedAsyncioTestCase):
         interval = 0.01
         timer = Timer(interval, f)
         timer.start()
-        await asyncio.sleep(interval * n_calls)
+        # subtract 0.5 to not have a 50/50 chance of the last call happening or not,
+        # but instead stop the timer in the midst of the sleep interval after the last expected call.
+        await asyncio.sleep(interval * (n_calls - 0.5))
         timer.stop()
         await asyncio.sleep(interval * n_calls)  # make sure it's really stopped
         self.assertEqual(f.call_count, n_calls)

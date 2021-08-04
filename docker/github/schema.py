@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from dataclasses_json import dataclass_json, Undefined
+from dataclasses_json import Undefined, dataclass_json
 
 from .util import DeploymentState
 

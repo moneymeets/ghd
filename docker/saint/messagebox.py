@@ -1,5 +1,5 @@
 import curses
-from typing import Optional, Union, Sequence, Any
+from typing import Any, Optional, Sequence, Union
 
 import blessed
 import blessed.keyboard

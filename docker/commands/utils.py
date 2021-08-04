@@ -6,11 +6,7 @@ from typing import Optional
 import click
 from babel.dates import format_datetime
 
-from github.util import (
-    get_current_deployment_id,
-    get_repo_fallback,
-    read_github_event_data,
-)
+from github.util import get_current_deployment_id, get_repo_fallback, read_github_event_data
 
 PRODUCTION_ENVIRONMENTS = ("live",)
 ORDERED_ENVIRONMENTS = ("dev", "test") + PRODUCTION_ENVIRONMENTS

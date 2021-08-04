@@ -1,14 +1,5 @@
 import curses
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Iterable,
-    Optional,
-    Sequence,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, Generic, Iterable, Optional, Sequence, TypeVar, Union
 
 import blessed
 import blessed.keyboard

@@ -10,13 +10,13 @@ import blessed
 import blessed.keyboard
 import blessed.sequences
 import colorama
-from dataclasses_json import dataclass_json
 import tabulate
+from dataclasses_json import dataclass_json
 
-from github import GitHub, GithubError, ConstraintError
+from github import ConstraintError, GitHub, GithubError
 from github.schema import Commit, Deployment, DeploymentStatus, Repository
-from github.util import get_state_color, short_sha, DeploymentState
-from output import color_success, color_error
+from github.util import DeploymentState, get_state_color, short_sha
+from output import color_error, color_success
 from saint import ExitApp
 from saint.messagebox import MessageBox
 from saint.multiview import MultiView
@@ -24,9 +24,10 @@ from saint.popover import popover, popover_confirm
 from saint.statusbar import StatusBar
 from saint.table import Column, Table, TableT
 from saint.timer import Timer
-from saint.util import exit_app, bullet_join
+from saint.util import bullet_join, exit_app
 from saint.widget import Widget
-from .utils import localize_date, ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, get_next_environment
+
+from .utils import ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, get_next_environment, localize_date
 
 
 class ViewMode(enum.Enum):

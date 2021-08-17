@@ -8,22 +8,18 @@ import tabulate
 
 from github import GitHub
 from github.util import (
+    DeploymentState,
+    color_state,
     get_commit_subject,
     get_commit_tags,
     get_current_environment,
-    get_head_rev,
     get_git_log,
+    get_head_rev,
     short_sha,
-    color_state,
-    DeploymentState,
 )
-from output import print_info, color_unknown, print_success
-from util import (
-    DependentOptionDefault,
-    bool_to_str,
-    handle_errors,
-    parse_require_context,
-)
+from output import color_unknown, print_info, print_success
+from util import DependentOptionDefault, bool_to_str, handle_errors, parse_require_context
+
 from .gui import gui_main
 from .utils import (
     ORDERED_ENVIRONMENTS,

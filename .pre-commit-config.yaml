@@ -1,7 +1,0 @@
-repos:
-  - repo: local
-    hooks:
-      - id: lint
-        name: lint
-        entry: bash ./lint-code.sh
-        language: system

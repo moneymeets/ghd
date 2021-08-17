@@ -1,13 +1,14 @@
-from asyncstdlib.builtins import any as aany
 import json
 import os
 from typing import Any, Optional, Sequence
 from urllib.parse import urlencode
 
 import aiohttp
+from asyncstdlib.builtins import any as aany
 
 from util import Error
-from .schema import Deployment, DeploymentStatus, Commit, Repository
+
+from .schema import Commit, Deployment, DeploymentStatus, Repository
 from .util import DeploymentState
 
 

@@ -6,7 +6,8 @@ import blessed.keyboard
 import blessed.sequences
 
 from .screenbuffer import ScreenBuffer
-from .signal import AsyncSignal as SaintSignal, AsyncSignals
+from .signal import AsyncSignal as SaintSignal
+from .signal import AsyncSignals
 from .style import Style
 
 Widget_co = TypeVar("Widget_co", bound="Widget", covariant=True)

@@ -6,28 +6,30 @@ authors = ["moneymeets GmbH <service@moneymeets.com>"]
 
 [tool.poetry.dependencies]
 python = "3.9.5"
-colorama = "*"
-tabulate = "*"
-progressbar2 = "*"
+
 aiohttp = "*"
-click = "*"
-blessed = "*"
-pyte = "*"
-babel = "*"
-pre-commit = "*"
-dataclasses-json = "*"
 asyncstdlib = "*"
+babel = "*"
+blessed = "*"
+click = "*"
+colorama = "*"
+dataclasses-json = "*"
+progressbar2 = "*"
+pyte = "*"
+tabulate = "*"
 
 [tool.poetry.dev-dependencies]
 coverage = "*"
 pytest = "*"
+
 black = "*"
 flake8 = "*"
 flake8-black = "*"
-flake8-quotes = "*"
 flake8-coding = "*"
 flake8-commas = "*"
-flake8-import-order = "*"
+flake8-isort = "*"
+flake8-quotes = "*"
+isort = { extras = ["pyproject"], version = "*" }
 
 [tool.poetry.scripts]
 ghd = 'ghd:run_main'
@@ -36,7 +38,10 @@ ghd = 'ghd:run_main'
 line_length = 120
 target_version = ["py39"]
 
+[tool.isort]
+profile = "black"
+line_length = 120
+
 [build-system]
 requires = ["poetry_core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-

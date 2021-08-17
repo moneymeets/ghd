@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import AnyStr, IO, Iterable, Iterator, Optional, Type
+from typing import IO, AnyStr, Iterable, Iterator, Optional, Type
 
 import pyte
 

@@ -29,6 +29,8 @@ from saint.widget import Widget
 
 from .utils import ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, get_next_environment, localize_date
 
+UNKNOWN_VALUE = "<unknown>"
+
 
 class ViewMode(enum.Enum):
     DEPLOYMENTS = enum.auto()
@@ -66,6 +68,21 @@ def bool_to_str(b: Optional[bool], max_length: int):
 
 def color_state(state: DeploymentState, max_length: int):
     return get_state_color(state) + state.value[:max_length]
+
+
+def get_commit_author(commit: Commit) -> str:
+    git_commit = commit.commit
+    return commit.author.login if commit.author else git_commit.author.email if git_commit.author else UNKNOWN_VALUE
+
+
+def get_commit_creation_date(commit: Commit) -> str:
+    git_commit = commit.commit
+    return localize_date(git_commit.author.date) if git_commit.author else UNKNOWN_VALUE
+
+
+def get_commit_committed_date(commit: Commit) -> str:
+    git_commit = commit.commit
+    return localize_date(git_commit.committer.date) if git_commit.committer else UNKNOWN_VALUE
 
 
 class SelectionTable(Table[TableT]):
@@ -119,8 +136,8 @@ class CommitSelection(SelectionTable[Commit]):
         super().__init__(
             parent,
             Column("Ref", self._commit_column),
-            Column("Created", lambda row, max_length: localize_date(row.commit.author.date, max_length)),
-            Column("Author", lambda row, max_length: row.author.login[:max_length]),
+            Column("Created", lambda row, max_length: get_commit_creation_date(row)[:max_length]),
+            Column("Author", lambda row, max_length: get_commit_author(row)[:max_length]),
             Column("Message", lambda row, max_length: row.commit.message.splitlines()[0][:max_length]),
         )
 
@@ -525,8 +542,8 @@ class MainView(MultiView[ViewMode]):
             }
             for commit in commits[::-1]:
                 table_data["sha"].append(short_sha(commit.sha))
-                table_data["committed"].append(localize_date(commit.commit.committer.date))
-                table_data["author"].append(commit.author.login)
+                table_data["committed"].append(get_commit_committed_date(commit))
+                table_data["author"].append(get_commit_author(commit))
                 message, *_ = commit.commit.message.splitlines()
                 table_data["message"].append(colorize_message(message, len(commit.parents) > 1))
 
@@ -581,8 +598,8 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
         self._deploy_view.choice_index = 1  # default to "No"
         self._deploy_view.message = f"""Deploy {short_sha(commit.sha)} to {ORDERED_ENVIRONMENTS[0]}?
 
-Author             {commit.author.login}
-Created            {localize_date(commit.commit.committer.date)}
+Author             {get_commit_author(commit)}
+Created            {get_commit_committed_date(commit)}
 Ref                {short_sha(commit.sha)}
 Description        {commit.commit.message.splitlines()[0]}
 Transient          {bool_to_str(False, 100)}{self.style.default}

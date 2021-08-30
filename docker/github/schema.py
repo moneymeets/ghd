@@ -41,14 +41,15 @@ class DeploymentStatus:
 @dataclass
 class GitActor:
     name: str
+    email: str
     date: str
 
 
 @dataclass_json(undefined=Undefined.EXCLUDE)
 @dataclass
 class CommitDetails:
-    committer: GitActor
-    author: GitActor
+    committer: Optional[GitActor]
+    author: Optional[GitActor]
     message: str
 
 
@@ -65,8 +66,8 @@ class CommitParent:
 class Commit:
     sha: str
     commit: CommitDetails
-    committer: Actor
-    author: Actor
+    committer: Optional[Actor]
+    author: Optional[Actor]
     parents: list[CommitParent]
 
 

@@ -185,6 +185,11 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     default=True,
     help="Check constraints before deployments, e.g. environment restrictions",
 )
+@click.option(
+    "--interactive/--non-interactive",
+    required=False,
+    default=True,
+)
 @handle_errors
 @coroutine
 async def cmd_deploy(
@@ -197,6 +202,7 @@ async def cmd_deploy(
     description: str,
     require_context: list[str],
     check_constraints: bool,
+    interactive: bool,
 ):
     require_context, require_context_str = parse_require_context(require_context)
 
@@ -223,9 +229,10 @@ async def cmd_deploy(
     else:
         print_info("First Deployment to this environment, not showing the commit list")
 
-    print()
-    if not click.confirm("Start deployment?"):
-        return
+    if interactive:
+        print()
+        if not click.confirm("Start deployment?"):
+            return
 
     print_info("Creating deployment")
 

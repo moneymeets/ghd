@@ -12,10 +12,7 @@ For later usage you can set this to your local profile settings.
 #### Install dependencies
 
 First ensure that you have a working Poetry installation.
-
-The `pyproject.toml` is located in the `docker` directory.
 ```
-cd docker
 poetry install
 ```
 
@@ -42,11 +39,11 @@ Commands:
 
 To use `ghd` from every location on your system, link the shell wrapper to your PATH.
 ```
-echo 'export PATH="~/path/to/ghd/docker:$PATH"' >> ~/.profile
+echo 'export PATH="~/path/to/ghd:$PATH"' >> ~/.profile
 ```
 or
 ```
-ln -s ~/path/to/ghd/docker/ghd $HOME/bin/
+ln -s ~/path/to/ghd/ghd $HOME/bin/
 ```
 
 #### Deployment

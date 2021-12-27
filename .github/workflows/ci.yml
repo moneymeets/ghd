@@ -6,14 +6,11 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 15
 
-    defaults:
-      run:
-        working-directory: docker
-
     steps:
       - uses: actions/checkout@v2
 
-      - name: Setup Python + Poetry
+      - id: deps
+        name: Setup Python + Poetry
         uses: moneymeets/action-setup-python-poetry@master
 
       - name: Run linter
@@ -36,7 +33,7 @@ jobs:
           echo "IMAGE=moneymeets/ghd:$TAG" >> $GITHUB_ENV
 
       - name: Build image
-        run: docker build --build-arg PYTHON_VERSION=${{ env.PYTHON_VERSION }} -t $IMAGE .
+        run: docker build --build-arg PYTHON_VERSION=${{ steps.deps.outputs.python-version }} -t $IMAGE .
 
       - name: Login to DockerHub
         uses: docker/login-action@v1

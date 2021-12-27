@@ -19,8 +19,8 @@ pyte = "*"
 tabulate = "*"
 
 [tool.poetry.dev-dependencies]
-coverage = "*"
 pytest = "*"
+pytest-cov = "*"
 
 add-trailing-comma = "*"
 black = "*"

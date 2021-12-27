@@ -22,9 +22,7 @@ jobs:
           poetry run flake8
 
       - name: Run tests
-        run: |
-          poetry run coverage run -m pytest
-          poetry run coverage report --fail-under 31
+        run: poetry run pytest --cov --cov-branch --cov-fail-under=31
 
       - name: Export image name
         run: |

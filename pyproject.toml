@@ -5,7 +5,7 @@ description = "GitHub Deployments API CLI"
 authors = ["moneymeets GmbH <service@moneymeets.com>"]
 
 [tool.poetry.dependencies]
-python = "3.9.5"
+python = "^3.10"
 
 aiohttp = "*"
 asyncstdlib = "*"
@@ -19,14 +19,14 @@ pyte = "*"
 tabulate = "*"
 
 [tool.poetry.dev-dependencies]
-coverage = "*"
 pytest = "*"
+pytest-cov = "*"
 
+add-trailing-comma = "*"
 black = "*"
 flake8 = "*"
 flake8-black = "*"
 flake8-coding = "*"
-flake8-commas = "*"
 flake8-isort = "*"
 flake8-quotes = "*"
 isort = { extras = ["pyproject"], version = "*" }
@@ -36,7 +36,7 @@ ghd = 'ghd:run_main'
 
 [tool.black]
 line_length = 120
-target_version = ["py39"]
+target_version = ["py310"]
 
 [tool.isort]
 profile = "black"

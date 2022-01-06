@@ -1,11 +1,12 @@
 import asyncio
 from datetime import datetime
 from functools import wraps
-from typing import Optional
+from typing import Any, Optional
 
 import click
 from babel.dates import format_datetime
 
+from github import ConstraintError, GitHub
 from github.util import get_current_deployment_id, get_repo_fallback, read_github_event_data
 
 PRODUCTION_ENVIRONMENTS = ("live",)
@@ -55,3 +56,40 @@ def get_next_environment(env: str) -> Optional[str]:
         # IndexError if we're already in the last environment in the chain
         # ValueError if the environment is not in the deployment chain
         return None
+
+
+async def deploy(
+    gh: GitHub,
+    ref: str,
+    environment: str,
+    task: str,
+    transient: bool,
+    production: bool,
+    description: str,
+    check_constraints: bool,
+    force: bool,
+    payload: Optional[Any] = None,
+) -> int:
+    if not force:
+        if check_constraints:
+            await gh.verify_ref_is_deployed_in_previous_environment(
+                ref,
+                environment,
+                ORDERED_ENVIRONMENTS,
+            )
+
+        check_suites = await gh.get_check_suites(ref)
+        if not all(check["conclusion"] == "success" for check in check_suites if check["app"]["slug"] != "dependabot"):
+            raise ConstraintError(
+                f"Deployment of {ref} to {environment} failed, because there are some checks not in a success state.",
+            )
+
+    return await gh.deploy(
+        environment=environment,
+        ref=ref,
+        transient=transient,
+        production=production,
+        task=task,
+        description=description,
+        payload=payload,
+    )

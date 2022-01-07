@@ -1,5 +1,4 @@
 from functools import wraps
-from typing import Optional
 
 import click
 
@@ -41,19 +40,6 @@ def bool_to_str(b):
         return color_success("yes")
     else:
         return color_error("no")
-
-
-def parse_require_context(require_context: list[str]) -> tuple[Optional[list[str]], str]:
-    if "-" in require_context:
-        if len(require_context) != 1:
-            raise RuntimeError("When not requiring any context by using '-', no other contexts must be required")
-        return [], color_error("none")
-    elif "+" in require_context:
-        if len(require_context) != 1:
-            raise RuntimeError("When requiring all contexts by using '+', no other contexts must be required")
-        return None, color_success("all")
-    else:
-        return require_context, color_unknown(", ".join(require_context))
 
 
 class DependentOptionDefault(click.Option):

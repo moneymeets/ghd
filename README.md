@@ -38,13 +38,10 @@ Commands:
 #### Link ghd to PATH
 
 To use `ghd` from every location on your system, link the shell wrapper to your PATH.
-```
-echo 'export PATH="~/path/to/ghd:$PATH"' >> ~/.profile
-```
-or
-```
-ln -s ~/path/to/ghd/ghd $HOME/bin/
-```
+
+1. Create a new directory to hold symlink: `mkdir $HOME/.bin`
+2. Create symlink to `ghd`: `ln -s ~/path/to/ghd/ghd $HOME/.bin/`
+3. Add `export PATH="$HOME/.bin:$PATH"` to `.profile`/`.zshrc`/`.bashrc`/`.bash_profile`/etc.
 
 #### Deployment
 

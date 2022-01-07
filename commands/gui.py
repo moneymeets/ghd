@@ -4,6 +4,7 @@ import curses
 import enum
 import signal
 from dataclasses import dataclass
+from functools import partial
 from typing import Optional
 
 import blessed
@@ -27,7 +28,7 @@ from saint.timer import Timer
 from saint.util import bullet_join, exit_app
 from saint.widget import Widget
 
-from .utils import ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, get_next_environment, localize_date
+from .utils import ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, deploy, get_next_environment, localize_date
 
 UNKNOWN_VALUE = "<unknown>"
 
@@ -373,9 +374,9 @@ class MainView(MultiView[ViewMode]):
         self._repo_list.data = await self._gh.repositories
         return True
 
-    async def _try_or_force_deploy(self, callback):
+    async def _try_or_force_deploy(self, deploy_func):
         try:
-            await callback(None)
+            await deploy_func(force=False)
         except (GithubError, ConstraintError) as ex:
             key = popover_confirm(
                 self,
@@ -387,7 +388,7 @@ class MainView(MultiView[ViewMode]):
             )
             if key == "Y":
                 try:
-                    await callback([])
+                    await deploy_func(force=True)
                 except (GithubError, ConstraintError) as ex:
                     popover_confirm(
                         self,
@@ -425,26 +426,20 @@ class MainView(MultiView[ViewMode]):
         # no need to check if we're already deployed in the previous environment (which is deployment.environment),
         # as we are already promoting from that deployment
 
-        async def deploy(contexts):
-            if contexts is None or contexts != []:
-                await self._gh.verify_ref_is_deployed_in_previous_environment(
-                    ref=deployment.ref,
-                    environment=next_env,
-                    ordered_environments=ORDERED_ENVIRONMENTS,
-                )
-            await self._gh.deploy(
-                ref=deployment.ref,
-                environment=next_env,
-                transient=False,
-                production=next_env in PRODUCTION_ENVIRONMENTS,
-                task=deployment.task,
-                description=deployment.description,
-                required_contexts=contexts,
-                payload={"ghd": self._deployment_payload.to_dict()},
-            )
-            self._deployment_payload = None
+        deploy_func = partial(
+            deploy,
+            gh=self._gh,
+            ref=deployment.ref,
+            environment=next_env,
+            task=deployment.task,
+            transient=False,
+            production=next_env in PRODUCTION_ENVIRONMENTS,
+            description=deployment.description,
+            check_constraints=True,
+        )
 
-        await self._try_or_force_deploy(deploy)
+        await self._try_or_force_deploy(deploy_func)
+        self._deployment_payload = None
         await self.show(ViewMode.DEPLOYMENTS)
         await self._reload_deployment_data()
         return True
@@ -457,20 +452,21 @@ class MainView(MultiView[ViewMode]):
 
         commit: Commit = self._commits.selected_data
 
-        async def deploy(contexts):
-            await self._gh.deploy(
-                environment=ORDERED_ENVIRONMENTS[0],
-                ref=commit.sha,
-                transient=False,
-                production=ORDERED_ENVIRONMENTS[0] in PRODUCTION_ENVIRONMENTS,
-                task="deploy",
-                description=commit.commit.message.splitlines()[0],
-                required_contexts=contexts,
-                payload={"ghd": self._deployment_payload.to_dict()},
-            )
-            self._deployment_payload = None
+        deploy_func = partial(
+            deploy,
+            gh=self._gh,
+            ref=commit.sha,
+            environment=ORDERED_ENVIRONMENTS[0],
+            task="deploy",
+            transient=False,
+            production=ORDERED_ENVIRONMENTS[0] in PRODUCTION_ENVIRONMENTS,
+            description=commit.commit.message.splitlines()[0],
+            check_constraints=False,
+            payload={"ghd": self._deployment_payload.to_dict()},
+        )
 
-        await self._try_or_force_deploy(deploy)
+        await self._try_or_force_deploy(deploy_func)
+        self._deployment_payload = None
         await self.show(ViewMode.DEPLOYMENTS)
         await self._reload_deployment_data()
         return True

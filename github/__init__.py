@@ -191,7 +191,6 @@ class GitHub:
         production: bool,
         task: str,
         description: str,
-        required_contexts: Optional[list[str]],
         payload: Optional[Any] = None,
     ) -> int:
         deployment_creation_result = await self.post(
@@ -204,7 +203,7 @@ class GitHub:
                 "production_environment": production,
                 "task": task,
                 "description": description,
-                "required_contexts": required_contexts,
+                "required_contexts": [],
                 "payload": json.dumps(payload) if payload else "",
             },
         )
@@ -227,3 +226,13 @@ class GitHub:
                     url = response.links.getone("next").getone("url")
                 except KeyError:
                     return result
+
+    async def get_check_suites(self, ref: str) -> list:
+        # https://docs.github.com/en/rest/reference/checks#list-check-suites-for-a-git-reference
+        response = await self.get(f"/repos/{self.repo_path}/commits/{ref}/check-suites")
+        GithubError.raise_from_message(response)
+
+        if "check_suites" not in response:
+            raise KeyError
+
+        return response["check_suites"]

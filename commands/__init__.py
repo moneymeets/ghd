@@ -18,7 +18,7 @@ from github.util import (
     short_sha,
 )
 from output import color_unknown, print_info, print_success
-from util import DependentOptionDefault, bool_to_str, handle_errors, parse_require_context
+from util import DependentOptionDefault, bool_to_str, handle_errors
 
 from .gui import gui_main
 from .utils import (
@@ -27,6 +27,7 @@ from .utils import (
     click_deployment_id_option,
     click_repo_option,
     coroutine,
+    deploy,
 )
 
 
@@ -170,12 +171,10 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     help="Deployment description",
 )
 @click.option(
-    "-c",
-    "--require-context",
-    multiple=True,
-    default=["+"],
-    help="Context required to be in success state for this deployment to run; "
-    "use a single '-' to require no contexts, or a single '+' to require all",
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Do not verify check suites statuses before deployment",
 )
 @click.option(
     "-C",
@@ -200,12 +199,10 @@ async def cmd_deploy(
     transient: bool,
     production: bool,
     description: str,
-    require_context: list[str],
+    force: bool,
     check_constraints: bool,
     interactive: bool,
 ):
-    require_context, require_context_str = parse_require_context(require_context)
-
     tags = ", ".join(get_commit_tags(ref))
     if tags:
         tags = f" ({tags})"
@@ -213,7 +210,7 @@ async def cmd_deploy(
     print_info(f"{repo}@{ref}{tags} will be deployed to {environment}")
     print(f"  transient          {bool_to_str(transient)}")
     print(f"  production         {bool_to_str(production)}")
-    print(f"  required contexts  {require_context_str}")
+    print(f"  force              {bool_to_str(force)}")
     print(f"  description        {description}")
 
     async with GitHub(repo_path=repo) as gh:
@@ -237,21 +234,16 @@ async def cmd_deploy(
     print_info("Creating deployment")
 
     async with GitHub(repo_path=repo) as gh:
-        if check_constraints:
-            await gh.verify_ref_is_deployed_in_previous_environment(
-                ref,
-                environment,
-                ORDERED_ENVIRONMENTS,
-            )
-
-        deployment_id = await gh.deploy(
-            environment=environment,
+        deployment_id = await deploy(
+            gh=gh,
             ref=ref,
+            environment=environment,
+            task=task,
             transient=transient,
             production=production,
-            task=task,
             description=description,
-            required_contexts=require_context,
+            check_constraints=check_constraints,
+            force=force,
         )
 
         print(f"::set-output name=deployment_id::{deployment_id}")

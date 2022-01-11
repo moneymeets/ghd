@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Optional
+from typing import Optional, Sequence
 
 import click
 import progressbar
@@ -20,7 +20,7 @@ from github.util import (
 from output import color_unknown, print_info, print_success
 from util import DependentOptionDefault, bool_to_str, handle_errors
 
-from .gui import gui_main
+from .gui import CommandOptions, gui_main
 from .utils import (
     ORDERED_ENVIRONMENTS,
     PRODUCTION_ENVIRONMENTS,
@@ -185,6 +185,22 @@ async def cmd_list(repo: str, verbose: bool, limit: int, environment: Optional[s
     help="Check constraints before deployments, e.g. environment restrictions",
 )
 @click.option(
+    "--exclude-check-run-name",
+    "exclude_check_run_names",
+    required=False,
+    multiple=True,
+    default=("rebase",),
+    help="Exclude check runs with the specified name from pre-deployment checks",
+)
+@click.option(
+    "--exclude-check-run-conclusion",
+    "exclude_check_run_conclusions",
+    required=False,
+    multiple=True,
+    default=("skipped",),
+    help="Exclude check runs with the specified conclusion from pre-deployment checks",
+)
+@click.option(
     "--interactive/--non-interactive",
     required=False,
     default=True,
@@ -201,6 +217,8 @@ async def cmd_deploy(
     description: str,
     force: bool,
     check_constraints: bool,
+    exclude_check_run_names: Sequence[str],
+    exclude_check_run_conclusions: Sequence[str],
     interactive: bool,
 ):
     tags = ", ".join(get_commit_tags(ref))
@@ -243,6 +261,8 @@ async def cmd_deploy(
             production=production,
             description=description,
             check_constraints=check_constraints,
+            exclude_check_run_names=exclude_check_run_names,
+            exclude_check_run_conclusions=exclude_check_run_conclusions,
             force=force,
         )
 
@@ -318,7 +338,33 @@ async def cmd_inspect(repo: str, deployment_id: int):
 
 @main_group.command(name="gui", short_help="Start interactive mode")
 @click_repo_option(required=False)
+@click.option(
+    "--exclude-check-run-name",
+    "exclude_check_run_names",
+    required=False,
+    multiple=True,
+    default=("rebase",),
+    help="Exclude check runs with the specified name from pre-deployment checks",
+)
+@click.option(
+    "--exclude-check-run-conclusion",
+    "exclude_check_run_conclusions",
+    required=False,
+    multiple=True,
+    default=("skipped",),
+    help="Exclude check runs with the specified conclusion from pre-deployment checks",
+)
 @coroutine
-async def cmd_gui(repo: Optional[str]):
+async def cmd_gui(
+    repo: Optional[str],
+    exclude_check_run_names: Sequence[str],
+    exclude_check_run_conclusions: Sequence[str],
+):
     async with GitHub(repo_path=repo or "") as gh:
-        await gui_main(gh)
+        await gui_main(
+            gh,
+            CommandOptions(
+                exclude_check_run_names=exclude_check_run_names,
+                exclude_check_run_conclusions=exclude_check_run_conclusions,
+            ),
+        )

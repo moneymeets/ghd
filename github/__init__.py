@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from typing import Any, Optional, Sequence
@@ -227,12 +228,24 @@ class GitHub:
                 except KeyError:
                     return result
 
-    async def get_check_suites(self, ref: str) -> list:
-        # https://docs.github.com/en/rest/reference/checks#list-check-suites-for-a-git-reference
-        response = await self.get(f"/repos/{self.repo_path}/commits/{ref}/check-suites")
-        GithubError.raise_from_message(response)
+    async def get_check_runs(self, ref: str) -> list:
+        """
+        Returns all check runs for the commit ref
+        """
+        per_page = 100
 
-        if "check_suites" not in response:
-            raise KeyError
+        async def _get_check_runs(page: int) -> tuple[list, int]:
+            # https://docs.github.com/en/rest/reference/checks#list-check-runs-for-a-git-reference
+            response = await self.get(
+                f"/repos/{self.repo_path}/commits/{ref}/check-runs?per_page={per_page}&page={page}",
+            )
+            GithubError.raise_from_message(response)
+            return response["check_runs"], response["total_count"]
 
-        return response["check_suites"]
+        check_runs, total_count = await _get_check_runs(page=1)
+        for runs, _ in await asyncio.gather(
+            *(_get_check_runs(page=page + 2) for page in range((total_count - 1) // per_page)),
+        ):
+            check_runs.extend(runs)
+
+        return check_runs

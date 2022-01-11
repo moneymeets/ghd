@@ -5,7 +5,7 @@ import enum
 import signal
 from dataclasses import dataclass
 from functools import partial
-from typing import Optional
+from typing import Optional, Sequence
 
 import blessed
 import blessed.keyboard
@@ -56,6 +56,12 @@ class DeploymentPayload:
     type: str  # cannot use "DeploymentType" directly here because it doesn't work with json.dumps
     from_ref: str
     to_ref: str
+
+
+@dataclass
+class CommandOptions:
+    exclude_check_run_names: Sequence[str]
+    exclude_check_run_conclusions: Sequence[str]
 
 
 def bool_to_str(b: Optional[bool], max_length: int):
@@ -196,9 +202,10 @@ class YesNoMessageBox(MessageBox):
 class MainView(MultiView[ViewMode]):
     on_status_changed: Widget.Signal
 
-    def __init__(self, parent: Widget, gh: GitHub):
+    def __init__(self, parent: Widget, gh: GitHub, cmd_options: CommandOptions):
         super().__init__(parent)
         self._gh = gh
+        self._cmd_options = cmd_options
 
         self._env_list = EnvironmentsList(self)
         self._env_list.on_item_selected += self.apply_environment_selection
@@ -436,6 +443,8 @@ class MainView(MultiView[ViewMode]):
             production=next_env in PRODUCTION_ENVIRONMENTS,
             description=deployment.description,
             check_constraints=True,
+            exclude_check_run_names=self._cmd_options.exclude_check_run_names,
+            exclude_check_run_conclusions=self._cmd_options.exclude_check_run_conclusions,
         )
 
         await self._try_or_force_deploy(deploy_func)
@@ -462,6 +471,8 @@ class MainView(MultiView[ViewMode]):
             production=ORDERED_ENVIRONMENTS[0] in PRODUCTION_ENVIRONMENTS,
             description=commit.commit.message.splitlines()[0],
             check_constraints=False,
+            exclude_check_run_names=self._cmd_options.exclude_check_run_names,
+            exclude_check_run_conclusions=self._cmd_options.exclude_check_run_conclusions,
             payload={"ghd": self._deployment_payload.to_dict()},
         )
 
@@ -630,9 +641,9 @@ Check constraints  {bool_to_str(True, 100)}{self.style.default}
 
 
 class MainWindow(StatusBar):
-    def __init__(self, term: blessed.Terminal, gh: GitHub):
+    def __init__(self, term: blessed.Terminal, gh: GitHub, cmd_options: CommandOptions):
         super().__init__(term)
-        self._main_view = MainView(self, gh)
+        self._main_view = MainView(self, gh, cmd_options)
         self._main_view.on_status_changed += self._change_text
         self.on_resize(term.width, term.height)
         self._resized = False
@@ -666,7 +677,7 @@ class MainWindow(StatusBar):
         self.screen.output()
 
 
-async def gui_main(gh: GitHub):
+async def gui_main(gh: GitHub, cmd_options: CommandOptions):
     try:
         term = blessed.Terminal()
 
@@ -675,7 +686,7 @@ async def gui_main(gh: GitHub):
                 return term.inkey()
 
         with term.fullscreen(), term.hidden_cursor():
-            main = MainWindow(term, gh)
+            main = MainWindow(term, gh, cmd_options)
             await main.init()
 
             while True:

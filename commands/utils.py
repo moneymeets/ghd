@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from functools import wraps
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 import click
 from babel.dates import format_datetime
@@ -67,6 +67,8 @@ async def deploy(
     production: bool,
     description: str,
     check_constraints: bool,
+    exclude_check_run_names: Sequence[str],
+    exclude_check_run_conclusions: Sequence[str],
     force: bool,
     payload: Optional[Any] = None,
 ) -> int:
@@ -78,8 +80,19 @@ async def deploy(
                 ORDERED_ENVIRONMENTS,
             )
 
-        check_suites = await gh.get_check_suites(ref)
-        if not all(check["conclusion"] == "success" for check in check_suites if check["app"]["slug"] != "dependabot"):
+        check_runs = await gh.get_check_runs(ref)
+
+        # Filter out check runs by names and conclusions
+        check_runs = tuple(
+            filter(
+                lambda run: (run["conclusion"] not in exclude_check_run_conclusions)
+                and (run["name"] not in exclude_check_run_names),
+                check_runs,
+            ),
+        )
+
+        # All filtered check runs should be in a success conclusion to deploy the application
+        if not all(run["conclusion"] == "success" for run in check_runs):
             raise ConstraintError(
                 f"Deployment of {ref} to {environment} failed, because there are some checks not in a success state.",
             )

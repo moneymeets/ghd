@@ -17,7 +17,6 @@ from dataclasses_json import dataclass_json
 from github import ConstraintError, GitHub, GithubError
 from github.schema import Commit, Deployment, DeploymentStatus, Repository
 from github.util import DeploymentState, get_state_color, short_sha
-from output import color_error, color_success
 from saint import ExitApp
 from saint.messagebox import MessageBox
 from saint.multiview import MultiView
@@ -27,6 +26,7 @@ from saint.table import Column, Table, TableT
 from saint.timer import Timer
 from saint.util import bullet_join, exit_app
 from saint.widget import Widget
+from shared.output import color_error, color_success
 
 from .utils import ORDERED_ENVIRONMENTS, PRODUCTION_ENVIRONMENTS, deploy, get_next_environment, localize_date
 

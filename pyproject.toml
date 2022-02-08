@@ -47,6 +47,7 @@ branch = true
 source = [
     "commands",
     "github",
+    "shared",
     "saint"
 ]
 omit = [

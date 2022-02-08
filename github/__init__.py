@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 import aiohttp
 from asyncstdlib.builtins import any as aany
 
-from util import Error
+from shared.util import Error
 
 from .schema import Commit, Deployment, DeploymentStatus, Repository
 from .util import DeploymentState

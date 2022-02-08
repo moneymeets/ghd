@@ -19,7 +19,7 @@ jobs:
           poetry run flake8
 
       - name: Run tests
-        run: poetry run pytest --cov --cov-branch --cov-fail-under=31
+        run: poetry run pytest --cov --cov-fail-under=30
 
       - name: Export image name
         run: |

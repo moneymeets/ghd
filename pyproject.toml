@@ -44,14 +44,9 @@ line_length = 120
 
 [tool.coverage.run]
 branch = true
-source = [
-    "commands",
-    "github",
-    "shared",
-    "saint"
-]
+source = ["."]
 omit = [
-    "**/tests/**",
+    "*/tests/*",
     "test_*.py"
 ]
 

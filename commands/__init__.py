@@ -17,8 +17,8 @@ from github.util import (
     get_head_rev,
     short_sha,
 )
-from output import color_unknown, print_info, print_success
-from util import DependentOptionDefault, bool_to_str, handle_errors
+from shared.output import color_unknown, print_info, print_success
+from shared.util import DependentOptionDefault, bool_to_str, handle_errors
 
 from .gui import CommandOptions, gui_main
 from .utils import (

@@ -7,8 +7,8 @@ from typing import Optional
 
 import colorama
 
-from output import color_str, print_info
-from util import deep_dict_get
+from shared.output import color_str, print_info
+from shared.util import deep_dict_get
 
 
 class DeploymentState(enum.Enum):

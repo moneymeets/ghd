@@ -2,7 +2,7 @@ from functools import wraps
 
 import click
 
-from output import color_error, color_success, color_unknown, print_error
+from .output import color_error, color_success, color_unknown, print_error
 
 
 class Error(Exception):

@@ -1,3 +1,7 @@
+# ⛔️ DEPRECATED
+
+This repository is no longer maintained. Please consider using [And Action](https://github.com/and-action/and-action) instead.
+
 ## GitHub Action Deployment (ghd)
 
 #### Personal GitHub Access Token
